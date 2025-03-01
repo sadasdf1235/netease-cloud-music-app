@@ -1,4 +1,4 @@
-import request from './index'
+import request from './request'
 
 /**
  * 获取首页轮播图
