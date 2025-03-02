@@ -117,7 +117,7 @@
                 <div class="text-xs text-gray-500 truncate">{{ song.artists.map(a => a.name).join('/') }}</div>
               </div>
               <div class="flex items-center gap-2">
-                <button class="icon-btn">
+                <button class="icon-btn" @click.stop="playAlbum(album.id)">
                   <div class="i-carbon-play-filled text-gray-500 hover:text-primary"></div>
                 </button>
               </div>
@@ -133,6 +133,7 @@
               v-for="album in newAlbums.slice(0, 5)" 
               :key="album.id" 
               class="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-dark-800 rounded-md transition-colors cursor-pointer"
+              @click="navigateToAlbum(album.id)"
             >
               <img :src="album.picUrl + '?param=60y60'" class="w-10 h-10 rounded mr-3 flex-shrink-0" :alt="album.name" />
               <div class="flex-1 min-w-0">
@@ -140,7 +141,7 @@
                 <div class="text-xs text-gray-500 truncate">{{ album.artist.name }}</div>
               </div>
               <div class="flex items-center gap-2">
-                <button class="icon-btn">
+                <button class="icon-btn" @click.stop="playAlbum(album.id)">
                   <div class="i-carbon-play-filled text-gray-500 hover:text-primary"></div>
                 </button>
               </div>
@@ -190,6 +191,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { getBanners, getRecommendPlaylists, getNewSongs, getNewAlbums, getHotArtists } from '@/api/music'
+import { getAlbumDetail } from '@/api/album'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -229,10 +231,29 @@ function navigateToPlaylist(id: number) {
   router.push(`/discover/playlist/${id}`)
 }
 
+// 跳转到专辑详情
+function navigateToAlbum(id: number) {
+  router.push(`/discover/album/${id}`)
+}
+
 // 播放歌曲
 function playSong(song: any) {
   playerStore.setPlaylist([song])
   playerStore.play(0)
+}
+
+// 播放专辑
+async function playAlbum(id: number) {
+  try {
+    // 调用获取专辑详情的API，获取专辑中的歌曲
+    const albumInfo = await getAlbumDetail(id)
+    if (albumInfo.songs && albumInfo.songs.length > 0) {
+      playerStore.setPlaylist(albumInfo.songs)
+      playerStore.play(0)
+    }
+  } catch (error) {
+    console.error('播放专辑失败:', error)
+  }
 }
 
 // 获取数据

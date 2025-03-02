@@ -23,14 +23,18 @@ const routes: RouteRecordRaw[] = [
         name: 'recommend',
         component: () => import('@/views/discover/recommend/index.vue'),
         meta: { title: '推荐' }
-      }
-      // 以下路由暂时注释，等待实现对应组件
-      /*
+      },
       {
         path: 'playlist',
         name: 'playlist',
         component: () => import('@/views/discover/playlist/index.vue'),
         meta: { title: '歌单' }
+      },
+      {
+        path: 'playlist/:id',
+        name: 'playlist-detail',
+        component: () => import('@/views/discover/playlist/detail.vue'),
+        meta: { title: '歌单详情' }
       },
       {
         path: 'toplist',
@@ -45,12 +49,17 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '歌手' }
       },
       {
+        path: 'artist/:id',
+        name: 'artist-detail',
+        component: () => import('@/views/discover/artist/detail.vue'),
+        meta: { title: '歌手详情' }
+      },
+      {
         path: 'album',
         name: 'album',
         component: () => import('@/views/discover/album/index.vue'),
-        meta: { title: '新碟上架' }
+        meta: { title: '专辑' }
       }
-      */
     ]
   }
   // 以下路由暂时注释，等待实现对应组件
