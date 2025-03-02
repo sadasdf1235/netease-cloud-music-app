@@ -239,7 +239,7 @@ function navigateToAlbum(id: number) {
 function playSong(index: number) {
   if (artistSongs.value.songs && artistSongs.value.songs.length > 0) {
     playerStore.setPlaylist(artistSongs.value.songs)
-    playerStore.play(index)
+    playerStore.play(0)
   }
 }
 
@@ -296,3 +296,4 @@ onMounted(() => {
     fetchArtistData(Number(artistId))
   }
 })
+</script>
