@@ -1,67 +1,74 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import type { RouteRecordRaw } from 'vue-router'
+import { createRouter, createWebHistory } from "vue-router";
+import type { RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
   {
-    path: '/',
-    redirect: '/discover'
+    path: "/",
+    redirect: "/discover",
   },
   {
-    path: '/login',
-    name: 'login',
-    component: () => import('@/views/login/index.vue'),
-    meta: { title: '登录' }
+    path: "/login",
+    name: "login",
+    component: () => import("@/views/login/index.vue"),
+    meta: { title: "登录" },
   },
   {
-    path: '/discover',
-    name: 'discover',
-    component: () => import('@/views/discover/index.vue'),
-    redirect: '/discover/recommend',
+    path: "/discover",
+    name: "discover",
+    component: () => import("@/views/discover/index.vue"),
+    redirect: "/discover/recommend",
     children: [
       {
-        path: 'recommend',
-        name: 'recommend',
-        component: () => import('@/views/discover/recommend/index.vue'),
-        meta: { title: '推荐' }
+        path: "recommend",
+        name: "recommend",
+        component: () => import("@/views/discover/recommend/index.vue"),
+        meta: { title: "推荐" },
       },
       {
-        path: 'playlist',
-        name: 'playlist',
-        component: () => import('@/views/discover/playlist/index.vue'),
-        meta: { title: '歌单' }
+        path: "playlist",
+        name: "playlist",
+        component: () => import("@/views/discover/playlist/index.vue"),
+        meta: { title: "歌单" },
       },
       {
-        path: 'playlist/:id',
-        name: 'playlist-detail',
-        component: () => import('@/views/discover/playlist/detail.vue'),
-        meta: { title: '歌单详情' }
+        path: "playlist/:id",
+        name: "playlist-detail",
+        component: () => import("@/views/discover/playlist/detail.vue"),
+        meta: { title: "歌单详情" },
       },
       {
-        path: 'toplist',
-        name: 'toplist',
-        component: () => import('@/views/discover/toplist/index.vue'),
-        meta: { title: '排行榜' }
+        path: "toplist",
+        name: "toplist",
+        component: () => import("@/views/discover/toplist/index.vue"),
+        meta: { title: "排行榜" },
       },
       {
-        path: 'artist',
-        name: 'artist',
-        component: () => import('@/views/discover/artist/index.vue'),
-        meta: { title: '歌手' }
+        path: "artist",
+        name: "artist",
+        component: () => import("@/views/discover/artist/index.vue"),
+        meta: { title: "歌手" },
       },
       {
-        path: 'artist/:id',
-        name: 'artist-detail',
-        component: () => import('@/views/discover/artist/detail.vue'),
-        meta: { title: '歌手详情' }
+        path: "artist/:id",
+        name: "artist-detail",
+        component: () => import("@/views/discover/artist/detail.vue"),
+        meta: { title: "歌手详情" },
       },
       {
-        path: 'album',
-        name: 'album',
-        component: () => import('@/views/discover/album/index.vue'),
-        meta: { title: '专辑' }
-      }
-    ]
-  }
+        path: "album",
+        name: "album",
+        component: () => import("@/views/discover/album/index.vue"),
+        meta: { title: "专辑" },
+      },
+    ],
+  },
+  // 添加测试页面路由
+  {
+    path: "/test/music",
+    name: "music-test",
+    component: () => import("@/views/test/MusicTest.vue"),
+    meta: { title: "音乐测试" },
+  },
   // 以下路由暂时注释，等待实现对应组件
   /*
   {
@@ -95,17 +102,17 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '404' }
   }
   */
-]
+];
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
-})
+  routes,
+});
 
 router.beforeEach((to, from, next) => {
   // 设置页面标题
-  document.title = `${to.meta.title ? to.meta.title + ' - ' : ''}网易云音乐`
-  next()
-})
+  document.title = `${to.meta.title ? to.meta.title + " - " : ""}网易云音乐`;
+  next();
+});
 
-export default router
+export default router;

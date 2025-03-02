@@ -238,21 +238,65 @@ function navigateToAlbum(id: number) {
 
 // 播放歌曲
 function playSong(song: any) {
-  playerStore.setPlaylist([song])
-  playerStore.play(0)
+  console.log('点击播放歌曲:', song.name, song.id);
+  // 确保歌曲对象包含必要的信息
+  if (!song || !song.id) {
+    console.error('歌曲数据不完整:', song);
+    return;
+  }
+  
+  try {
+    // 设置播放列表并播放
+    playerStore.setPlaylist([song]);
+    playerStore.play(0);
+    
+    // 确保播放状态设置为播放
+    if (!playerStore.playing) {
+      console.log('设置播放状态为true');
+      playerStore.togglePlay();
+    }
+    
+    console.log('播放列表已设置，当前歌曲:', playerStore.currentSong?.name);
+    console.log('当前播放状态:', playerStore.playing ? '播放中' : '已暂停');
+  } catch (error) {
+    console.error('播放歌曲出错:', error);
+  }
 }
 
 // 播放专辑
 async function playAlbum(id: number) {
+  console.log('点击播放专辑, ID:', id);
   try {
     // 调用获取专辑详情的API，获取专辑中的歌曲
-    const albumInfo = await getAlbumDetail(id)
+    const albumInfo = await getAlbumDetail(id);
+    console.log('获取到专辑信息:', albumInfo);
+    
     if (albumInfo.songs && albumInfo.songs.length > 0) {
-      playerStore.setPlaylist(albumInfo.songs)
-      playerStore.play(0)
+      console.log('设置播放列表, 歌曲数量:', albumInfo.songs.length);
+      playerStore.setPlaylist(albumInfo.songs);
+      playerStore.play(0);
+      
+      // 确保播放状态设置为播放
+      if (!playerStore.playing) {
+        console.log('设置播放状态为true');
+        playerStore.togglePlay();
+      }
+      
+      console.log('播放列表已设置，当前歌曲:', playerStore.currentSong);
+      console.log('当前播放状态:', playerStore.playing ? '播放中' : '已暂停');
+      
+      // 强制刷新播放状态
+      setTimeout(() => {
+        if (!playerStore.playing) {
+          console.log('播放状态仍为false，强制设置为true');
+          playerStore.togglePlay();
+        }
+      }, 100);
+    } else {
+      console.error('专辑中没有歌曲');
     }
   } catch (error) {
-    console.error('播放专辑失败:', error)
+    console.error('播放专辑失败:', error);
   }
 }
 
@@ -273,13 +317,34 @@ async function fetchData() {
 
     // 获取新歌
     newSongsLoading.value = true
+    console.log('开始获取新歌数据')
     const newSongsRes = await getNewSongs()
-    newSongs.value = newSongsRes.data
+    console.log('获取到新歌数据:', newSongsRes)
+    
+    if (newSongsRes.data && newSongsRes.data.length > 0) {
+      newSongs.value = newSongsRes.data
+      console.log('设置新歌数据, 数量:', newSongs.value.length)
+      console.log('第一首新歌:', newSongs.value[0])
+      
+      // 测试播放第一首新歌
+      if (newSongs.value.length > 0 && !playerStore.currentSong) {
+        console.log('尝试添加第一首新歌到播放列表')
+        const firstSong = newSongs.value[0]
+        // 确保歌曲数据完整
+        if (firstSong && firstSong.id) {
+          playerStore.setPlaylist([firstSong])
+          console.log('已添加第一首新歌到播放列表')
+        }
+      }
+    } else {
+      console.error('新歌数据为空或格式不正确')
+    }
     newSongsLoading.value = false
 
     // 获取新碟
     newAlbumsLoading.value = true
     const newAlbumsRes = await getNewAlbums(10)
+    console.log('获取到新碟数据:', newAlbumsRes)
     newAlbums.value = newAlbumsRes.albums
     newAlbumsLoading.value = false
 
@@ -293,7 +358,34 @@ async function fetchData() {
   }
 }
 
-onMounted(() => {
-  fetchData()
-})
+// 组件挂载时获取数据
+onMounted(async () => {
+  await fetchData();
+  
+  // 测试播放功能 - 使用固定的热门歌曲ID
+  console.log('测试播放功能');
+  const testSong = {
+    id: 1901371647, // 周杰伦 - 晴天
+    name: '晴天',
+    artists: [{ id: 6452, name: '周杰伦' }],
+    album: { 
+      id: 34209,
+      name: '叶惠美', 
+      picUrl: 'https://p2.music.126.net/cUTk0ewrQtYGP2YpPZoUng==/3265549553028224.jpg'
+    },
+    duration: 269000 // 4:29
+  };
+  
+  console.log('设置测试歌曲:', testSong);
+  playerStore.setPlaylist([testSong]);
+  playerStore.play(0);
+  
+  // 延迟一秒后再切换播放状态，确保歌曲URL已经获取
+  setTimeout(() => {
+    console.log('延迟后切换播放状态为播放');
+    if (!playerStore.playing) {
+      playerStore.togglePlay();
+    }
+  }, 1000);
+});
 </script>

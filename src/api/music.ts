@@ -102,14 +102,49 @@ export function getSongDetail(ids: string) {
 
 /**
  * 获取歌曲URL
- * @param id 歌曲id
+ * @param id 歌曲ID
+ * @param level 音质等级
+ * @returns Promise
  */
-export function getSongUrl(id: number) {
+export function getSongUrl(id: number, br: number = 320000) {
+  console.log('调用 getSongUrl API, 歌曲ID:', id, '比特率:', br);
+  
+  // 新版API改用了level参数代替br参数
+  // exhigh: 极高 (320kbps) 
+  // lossless: 无损
+  // hires: Hi-Res
+  // standard: 标准 (128kbps)
+  // higher: 较高 (192kbps)
+  const level = br >= 320000 ? 'exhigh' : (br >= 192000 ? 'higher' : 'standard');
+  
+  // 添加时间戳避免缓存问题
+  const timestamp = Date.now();
+  
   return request({
-    url: '/song/url',
+    url: '/song/url/v1',  // 使用新版API
     method: 'get',
-    params: { id }
-  })
+    params: { 
+      id, 
+      level,
+      timestamp
+    }
+  });
+}
+
+/**
+ * 获取歌曲详情，可传入多首
+ * @param ids 
+ * @returns 
+ */
+export function getSongsDetail(ids: string) {
+  return request({
+    url: '/song/detail',
+    method: 'get',
+    params: {
+      ids,
+      timestamp: Date.now()
+    }
+  });
 }
 
 /**
