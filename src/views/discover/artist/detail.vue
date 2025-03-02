@@ -244,6 +244,13 @@
                   <div class="i-carbon-play-filled mr-1"></div>
                   <span>播放</span>
                 </button>
+                <button
+                  class="flex items-center text-white text-xs hover:text-primary-light transition-colors"
+                  @click.stop="addAlbumToPlaylist(album.id)"
+                >
+                  <div class="i-carbon-add mr-1"></div>
+                  <span>添加</span>
+                </button>
               </div>
             </div>
           </div>
@@ -314,6 +321,7 @@ import {
   getSimilarArtists,
 } from "@/api/artist";
 import { getAlbumDetail } from "@/api/album";
+import { ElMessage } from "element-plus";
 
 const route = useRoute();
 const router = useRouter();
@@ -374,6 +382,27 @@ async function playAlbum(id: number) {
     }
   } catch (error) {
     console.error("播放专辑失败:", error);
+  }
+}
+
+// 添加专辑到播放列表
+async function addAlbumToPlaylist(id: number) {
+  try {
+    const albumDetail = await getAlbumDetail(id);
+    if (albumDetail && albumDetail.songs && albumDetail.songs.length > 0) {
+      // 将专辑中的所有歌曲添加到播放列表，但不立即播放
+      albumDetail.songs.forEach(song => {
+        playerStore.addToPlaylist(song);
+      });
+      // 显示提示信息
+      ElMessage({
+        message: `已将专辑《${albumDetail.album.name}》添加到播放列表`,
+        type: 'success',
+      });
+    }
+  } catch (error) {
+    console.error('添加专辑到播放列表失败:', error);
+    ElMessage.error('添加到播放列表失败');
   }
 }
 

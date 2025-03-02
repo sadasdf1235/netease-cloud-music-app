@@ -141,7 +141,7 @@
                 <div class="text-xs text-gray-500 truncate">{{ album.artist.name }}</div>
               </div>
               <div class="flex items-center gap-2">
-                <button class="icon-btn" @click.stop="playAlbum(song.album.id)">
+                <button class="icon-btn" @click.stop="playAlbum(album.id)">
                   <div class="i-carbon-play-filled text-gray-500 hover:text-primary"></div>
                 </button>
               </div>

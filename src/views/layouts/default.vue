@@ -75,66 +75,11 @@
           <div v-else class="text-sm text-gray-500">未播放</div>
         </div>
         
-        <!-- 播放控制 -->
-        <div class="flex flex-col items-center">
-          <div class="flex items-center gap-4">
-            <button class="icon-btn" @click="playerStore.prev()">
-              <div class="i-carbon-previous-filled"></div>
-            </button>
-            <button 
-              class="w-10 h-10 rounded-full bg-primary flex-center text-white"
-              @click="playerStore.togglePlay()"
-            >
-              <div v-if="playerStore.playing" class="i-carbon-pause-filled"></div>
-              <div v-else class="i-carbon-play-filled"></div>
-            </button>
-            <button class="icon-btn" @click="playerStore.next()">
-              <div class="i-carbon-next-filled"></div>
-            </button>
-          </div>
-          
-          <!-- 进度条 -->
-          <div class="hidden md:flex items-center gap-2 w-96 mt-1">
-            <span class="text-xs">{{ formatTime(currentTime) }}</span>
-            <div 
-              class="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer"
-              @click="handleProgressClick"
-              ref="progressBarRef"
-            >
-              <div 
-                class="h-full bg-primary rounded-full absolute top-0 left-0"
-                :style="{ width: progress + '%' }"
-              ></div>
-            </div>
-            <span class="text-xs">{{ formatTime(playerStore.currentSong?.duration || 0) }}</span>
-          </div>
-        </div>
+        <!-- 播放控制 - 使用Player组件 -->
+        <Player />
         
-        <!-- 音量控制 -->
+        <!-- 播放列表按钮 -->
         <div class="hidden md:flex items-center gap-4">
-          <div class="flex items-center gap-2">
-            <button class="icon-btn" @click="toggleMute">
-              <div v-if="isMuted" class="i-carbon-volume-mute"></div>
-              <div v-else-if="playerStore.volume > 50" class="i-carbon-volume-up"></div>
-              <div v-else-if="playerStore.volume > 0" class="i-carbon-volume-down"></div>
-              <div v-else class="i-carbon-volume-mute"></div>
-            </button>
-            <div 
-              class="w-20 h-1 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer"
-              @click="handleVolumeClick"
-              ref="volumeBarRef"
-            >
-              <div 
-                class="h-full bg-primary rounded-full absolute top-0 left-0"
-                :style="{ width: playerStore.volume + '%' }"
-              ></div>
-            </div>
-          </div>
-          <button class="icon-btn" @click="togglePlayMode">
-            <div v-if="playerStore.playMode === 0" class="i-carbon-repeat" title="顺序播放"></div>
-            <div v-else-if="playerStore.playMode === 1" class="i-carbon-repeat-one" title="单曲循环"></div>
-            <div v-else class="i-carbon-shuffle" title="随机播放"></div>
-          </button>
           <button class="icon-btn" @click="togglePlaylistPanel">
             <div class="i-carbon-playlist"></div>
           </button>
@@ -154,6 +99,7 @@ import { usePlayerStore } from '@/stores/player'
 import { getSongUrl } from '@/api/music'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import PlaylistPanel from '@/components/common/PlaylistPanel.vue'
+import Player from '@/components/common/Player.vue'
 
 const userStore = useUserStore()
 const playerStore = usePlayerStore()
