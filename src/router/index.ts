@@ -7,6 +7,12 @@ const routes: RouteRecordRaw[] = [
     redirect: '/discover'
   },
   {
+    path: '/login',
+    name: 'login',
+    component: () => import('@/views/login/index.vue'),
+    meta: { title: '登录' }
+  },
+  {
     path: '/discover',
     name: 'discover',
     component: () => import('@/views/discover/index.vue'),

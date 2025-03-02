@@ -41,9 +41,11 @@
             <img :src="userStore.profile?.avatarUrl" class="w-8 h-8 rounded-full" />
             <span class="hidden md:inline text-sm">{{ userStore.profile?.nickname }}</span>
           </div>
-          <button v-else class="text-sm px-4 py-1 rounded-full border border-gray-300 dark:border-gray-700">
-            登录
-          </button>
+          <router-link to="/login" v-else>
+            <button class="text-sm px-4 py-1 rounded-full border border-gray-300 dark:border-gray-700 hover:text-primary hover:border-primary transition-colors">
+              登录
+            </button>
+          </router-link>
         </div>
       </div>
     </header>

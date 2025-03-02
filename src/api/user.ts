@@ -147,3 +147,14 @@ export function likeSong(id: number, like: boolean) {
     params: { id, like }
   })
 }
+
+/**
+ * 获取用户账号信息
+ */
+export function getUserAccount() {
+  return request({
+    url: '/user/account',
+    method: 'get',
+    params: { timestamp: Date.now() }
+  })
+}
