@@ -12,6 +12,7 @@ declare module 'vue' {
     NCarousel: typeof import('naive-ui')['NCarousel']
     NCarouselItem: typeof import('naive-ui')['NCarouselItem']
     NModal: typeof import('naive-ui')['NModal']
+    PlaylistPanel: typeof import('./components/common/PlaylistPanel.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ThemeToggle: typeof import('./components/common/ThemeToggle.vue')['default']

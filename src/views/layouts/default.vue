@@ -112,27 +112,59 @@
         
         <!-- 音量控制 -->
         <div class="hidden md:flex items-center gap-4">
-          <button class="icon-btn">
-            <div class="i-carbon-volume-up"></div>
+          <div class="flex items-center gap-2">
+            <button class="icon-btn" @click="toggleMute">
+              <div v-if="isMuted" class="i-carbon-volume-mute"></div>
+              <div v-else-if="playerStore.volume > 50" class="i-carbon-volume-up"></div>
+              <div v-else-if="playerStore.volume > 0" class="i-carbon-volume-down"></div>
+              <div v-else class="i-carbon-volume-mute"></div>
+            </button>
+            <div 
+              class="w-20 h-1 bg-gray-200 dark:bg-gray-700 rounded-full relative cursor-pointer"
+              @click="handleVolumeClick"
+              ref="volumeBarRef"
+            >
+              <div 
+                class="h-full bg-primary rounded-full absolute top-0 left-0"
+                :style="{ width: playerStore.volume + '%' }"
+              ></div>
+            </div>
+          </div>
+          <button class="icon-btn" @click="togglePlayMode">
+            <div v-if="playerStore.playMode === 0" class="i-carbon-repeat" title="顺序播放"></div>
+            <div v-else-if="playerStore.playMode === 1" class="i-carbon-repeat-one" title="单曲循环"></div>
+            <div v-else class="i-carbon-shuffle" title="随机播放"></div>
           </button>
-          <button class="icon-btn">
+          <button class="icon-btn" @click="togglePlaylistPanel">
             <div class="i-carbon-playlist"></div>
           </button>
         </div>
       </div>
     </footer>
+    
+    <!-- 播放列表面板 -->
+    <PlaylistPanel :is-visible="showPlaylistPanel" @close="showPlaylistPanel = false" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { usePlayerStore } from '@/stores/player'
 import { getSongUrl } from '@/api/music'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import PlaylistPanel from '@/components/common/PlaylistPanel.vue'
 
 const userStore = useUserStore()
 const playerStore = usePlayerStore()
+
+// 播放列表面板
+const showPlaylistPanel = ref(false)
+
+// 切换播放列表面板显示状态
+function togglePlaylistPanel() {
+  showPlaylistPanel.value = !showPlaylistPanel.value
+}
 
 // 导航项
 const navItems = [
@@ -152,6 +184,9 @@ const progress = computed(() => {
   return (currentTime.value / playerStore.currentSong.duration) * 100
 })
 const progressBarRef = ref<HTMLDivElement | null>(null)
+const volumeBarRef = ref<HTMLDivElement | null>(null)
+const previousVolume = ref(60) // 存储静音前的音量
+const isMuted = ref(false)
 
 // 格式化时间
 function formatTime(time: number) {
@@ -174,6 +209,39 @@ function handleProgressClick(e: MouseEvent) {
     const newTime = percentage * playerStore.currentSong.duration / 1000
     audioRef.value.currentTime = newTime
   }
+}
+
+// 点击音量条
+function handleVolumeClick(e: MouseEvent) {
+  if (!volumeBarRef.value) return
+  
+  const rect = volumeBarRef.value.getBoundingClientRect()
+  const offsetX = e.clientX - rect.left
+  const percentage = Math.max(0, Math.min(100, (offsetX / rect.width) * 100))
+  
+  playerStore.setVolume(Math.round(percentage))
+  if (percentage > 0 && isMuted.value) {
+    isMuted.value = false
+  }
+}
+
+// 切换静音
+function toggleMute() {
+  if (isMuted.value) {
+    // 取消静音，恢复之前的音量
+    playerStore.setVolume(previousVolume.value)
+    isMuted.value = false
+  } else {
+    // 静音，保存当前音量
+    previousVolume.value = playerStore.volume
+    playerStore.setVolume(0)
+    isMuted.value = true
+  }
+}
+
+// 切换播放模式
+function togglePlayMode() {
+  playerStore.changePlayMode()
 }
 
 // 监听播放器状态变化
