@@ -13,6 +13,7 @@
       @play="onPlay"
       @pause="onPause"
       @loadeddata="onLoadedData"
+      @loadedmetadata="onLoadedMetadata"
       preload="auto"
       crossorigin="anonymous"
     ></audio>
@@ -49,16 +50,42 @@
       </button>
     </div>
     
-    <!-- 简单调试区域 -->
-    <div class="bg-red-100 p-2 mb-4 rounded text-xs">
-      <div>歌曲: {{ playerStore.currentSong?.name || '无' }}</div>
-      <div>URL: {{ currentSongUrl || '无' }}</div>
-      <div>状态: {{ playerStore.playing ? '播放中' : '暂停' }}</div>
-      <div>时间: {{ formatTime(playerStore.currentTime) }}/{{ formatTime(playerStore.duration) }}</div>
-      <div>进度: {{ Math.round(playerStore.progress) }}%</div>
-      <div v-if="audioError" class="text-red-600">错误: {{ audioError }}</div>
-      <button @click="testPlayDirectly" class="bg-blue-500 text-white px-2 py-1 rounded mt-1">测试直接播放</button>
-      <button @click="updatePlayButtonState" class="bg-green-500 text-white px-2 py-1 rounded mt-1 ml-2">刷新UI</button>
+    <!-- 调试与状态区域 -->
+    <div class="bg-gray-50 dark:bg-dark-800 p-3 mb-4 rounded-lg shadow-sm text-xs">
+      <div class="flex flex-wrap gap-x-4 gap-y-2 mb-2">
+        <div class="flex items-center">
+          <span class="text-gray-500 mr-1">歌曲:</span>
+          <span class="font-medium">{{ playerStore.currentSong?.name || '无' }}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="text-gray-500 mr-1">状态:</span>
+          <span class="font-medium" :class="{'text-primary': playerStore.playing}">{{ playerStore.playing ? '播放中' : '暂停' }}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="text-gray-500 mr-1">进度:</span>
+          <span class="font-medium">{{ Math.round(playerStore.progress) }}%</span>
+        </div>
+        <div class="flex items-center">
+          <span class="text-gray-500 mr-1">URL:</span>
+          <span class="font-medium truncate max-w-[200px]">{{ currentSongUrl || '未设置' }}</span>
+        </div>
+      </div>
+      <div v-if="audioError" class="text-red-500 mb-2 p-1 bg-red-50 dark:bg-red-900/20 rounded border-l-2 border-red-500">
+        <div class="flex items-center">
+          <div class="i-carbon-warning-filled mr-1"></div>
+          <span>{{ audioError }}</span>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button @click="testPlayDirectly" class="bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary/90 transition-colors flex items-center">
+          <div class="i-carbon-play-filled mr-1"></div>
+          <span>测试直接播放</span>
+        </button>
+        <button @click="updatePlayButtonState" class="bg-gray-200 dark:bg-dark-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded text-xs hover:bg-gray-300 dark:hover:bg-dark-600 transition-colors flex items-center">
+          <div class="i-carbon-renew mr-1"></div>
+          <span>刷新UI</span>
+        </button>
+      </div>
     </div>
 
     <!-- 进度条 -->
@@ -122,15 +149,6 @@
         <div class="i-carbon-next-filled"></div>
       </button>
 
-      <!-- 测试直接播放按钮 -->
-      <button
-        class="icon-btn bg-red-500 text-white rounded-full w-8 h-8 flex-center"
-        @click="testPlayDirectly"
-        title="测试直接播放"
-      >
-        <div class="i-carbon-play-filled"></div>
-      </button>
-
       <!-- 音量控制 -->
       <div class="flex items-center gap-2">
         <button class="icon-btn" @click="toggleMute">
@@ -161,7 +179,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { usePlayerStore } from "@/stores/player";
-import axios from "axios";
+import { getSongUrl as apiGetSongUrl } from "@/api/music";
 
 // 播放器组件主要变量
 const audioRef = ref<HTMLAudioElement | null>(null);
@@ -176,12 +194,13 @@ const showPlaylistPanel = ref(false);
 // 获取歌曲URL的函数
 async function getSongUrl(id: number): Promise<string> {
   try {
-    // 尝试使用网易云API获取真实播放地址
-    const response = await axios.get(`https://netease-cloud-music-api.vercel.app/song/url?id=${id}`);
-    console.log("获取歌曲URL响应:", response.data);
+    // 使用项目中的API模块获取歌曲URL
+    console.log("开始获取歌曲URL, ID:", id);
+    const response = await apiGetSongUrl(id);
+    console.log("获取歌曲URL响应:", response);
     
-    if (response.data && response.data.data && response.data.data.length > 0) {
-      const url = response.data.data[0].url;
+    if (response && response.data && response.data.length > 0) {
+      const url = response.data[0].url;
       if (url) {
         console.log("获取到真实播放地址:", url);
         return url;
@@ -252,7 +271,8 @@ watch(
         audioRef.value.src = "";
       }
     }
-  }
+  },
+  { immediate: true } // 立即执行一次，确保初始化时加载当前歌曲
 );
 
 // 监听播放状态变化
@@ -398,7 +418,17 @@ function onError(e: Event) {
   console.error("音频播放错误", e);
   const audio = audioRef.value;
   if (audio && audio.error) {
-    const errorMsg = `播放错误: ${audio.error.code}`;
+    // 获取更详细的错误信息
+    let errorDetails = "";
+    switch(audio.error.code) {
+      case 1: errorDetails = "获取资源被中止"; break;
+      case 2: errorDetails = "网络错误"; break;
+      case 3: errorDetails = "解码错误"; break;
+      case 4: errorDetails = "资源不可用或格式不支持"; break;
+      default: errorDetails = "未知错误";
+    }
+    
+    const errorMsg = `播放错误: ${errorDetails} (${audio.error.code})`;
     console.error(errorMsg, audio.error);
     audioError.value = errorMsg;
     
@@ -417,9 +447,10 @@ function onError(e: Event) {
             if (audioRef.value) {
               audioRef.value.play().catch(err => {
                 console.error("备用URL播放失败:", err);
+                audioError.value = "备用URL播放失败，请尝试点击播放按钮";
               });
             }
-          }, 100);
+          }, 300); // 增加延迟，确保有足够时间加载
         }
       }
     }
@@ -566,7 +597,7 @@ function togglePlayMode() {
 }
 
 // 直接测试播放功能
-function testPlayDirectly() {
+async function testPlayDirectly() {
   console.log("测试直接播放");
 
   try {
@@ -576,39 +607,57 @@ function testPlayDirectly() {
       return;
     }
     
-    // 使用直接URL
-    const directUrl = `https://music.163.com/song/media/outer/url?id=${playerStore.currentSong.id}.mp3`;
-    console.log("使用直接URL:", directUrl);
-    
-    // 设置URL
-    currentSongUrl.value = directUrl;
-    
-    // 重置加载状态
-    audioLoaded.value = false;
+    // 重置错误状态
     audioError.value = null;
+    audioLoaded.value = false;
+    
+    // 获取歌曲URL
+    try {
+      console.log("尝试通过API获取歌曲URL");
+      const url = await apiGetSongUrl(playerStore.currentSong.id);
+      
+      if (url && url.data && url.data.length > 0 && url.data[0].url) {
+        currentSongUrl.value = url.data[0].url;
+        console.log("成功获取API歌曲URL:", currentSongUrl.value);
+      } else {
+        // 如果API未返回有效URL，使用备用URL
+        currentSongUrl.value = `https://music.163.com/song/media/outer/url?id=${playerStore.currentSong.id}.mp3`;
+        console.log("API未返回有效URL，使用备用URL:", currentSongUrl.value);
+      }
+    } catch (error) {
+      console.error("通过API获取URL失败，使用备用URL", error);
+      currentSongUrl.value = `https://music.163.com/song/media/outer/url?id=${playerStore.currentSong.id}.mp3`;
+    }
     
     // 设置音频元素
     if (audioRef.value) {
-      audioRef.value.src = directUrl;
+      console.log("设置音频源:", currentSongUrl.value);
+      audioRef.value.src = currentSongUrl.value;
       audioRef.value.load();
       
       // 尝试播放
       console.log("开始测试播放");
-      const playPromise = audioRef.value.play();
-      
-      // 确保播放状态为播放
-      if (!playerStore.playing) {
-        playerStore.togglePlay();
-      }
-      
-      // 处理播放承诺
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
+      try {
+        const playPromise = audioRef.value.play();
+        
+        // 确保播放状态为播放
+        if (!playerStore.playing) {
+          playerStore.togglePlay();
+        }
+        
+        // 处理播放承诺
+        if (playPromise !== undefined) {
+          await playPromise;
           console.log("测试播放成功");
-        }).catch(error => {
-          console.error("测试播放失败:", error);
-          audioError.value = "测试播放失败: " + (error instanceof Error ? error.message : String(error));
-        });
+        }
+      } catch (playError) {
+        console.error("测试播放失败:", playError);
+        audioError.value = "测试播放失败: " + (playError instanceof Error ? playError.message : String(playError));
+        
+        // 如果播放失败但状态是播放，恢复为暂停状态
+        if (playerStore.playing) {
+          playerStore.togglePlay();
+        }
       }
     } else {
       console.error("音频元素未初始化");
@@ -619,6 +668,82 @@ function testPlayDirectly() {
     audioError.value = "测试播放出错: " + (error instanceof Error ? error.message : String(error));
   }
 }
+
+// 更新UI状态
+function updatePlayButtonState() {
+  console.log("手动更新UI状态");
+  // 确保组件响应性更新
+  if (playerStore.playing) {
+    console.log("当前状态为播放，尝试重新渲染");
+    playerStore.togglePlay();
+    setTimeout(() => {
+      playerStore.togglePlay();
+    }, 100);
+  } else {
+    console.log("当前状态为暂停，尝试重新渲染");
+    playerStore.togglePlay();
+    setTimeout(() => {
+      playerStore.togglePlay();
+    }, 100);
+  }
+}
+
+// 格式化时间
+function formatTime(time: number) {
+  if (isNaN(time)) return '00:00';
+  
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// 组件挂载时初始化
+onMounted(() => {
+  console.log("Player组件已挂载");
+
+  // 初始化音频元素
+  if (audioRef.value) {
+    // 设置初始音量
+    audioRef.value.volume = playerStore.volume / 100;
+    console.log("设置初始音量:", playerStore.volume);
+
+    // 如果当前有歌曲，尝试加载
+    if (playerStore.currentSong) {
+      console.log("挂载时发现当前有歌曲:", playerStore.currentSong.name);
+      
+      // 获取URL并设置
+      getSongUrl(playerStore.currentSong.id).then(url => {
+        currentSongUrl.value = url;
+        console.log("获取到歌曲URL:", currentSongUrl.value);
+        
+        // 设置音频源
+        audioRef.value!.src = currentSongUrl.value;
+        audioRef.value!.load();
+        
+        // 如果状态是播放，尝试播放
+        if (playerStore.playing) {
+          console.log("状态为播放，尝试播放");
+          
+          // 延迟一点播放，确保URL已设置
+          setTimeout(() => {
+            if (audioRef.value) {
+              const playPromise = audioRef.value.play();
+              if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                  console.error("初始播放失败:", error);
+                  console.log("需要用户交互才能播放音频，请点击播放按钮");
+                });
+              }
+            }
+          }, 500);
+        }
+      }).catch(error => {
+        console.error("获取歌曲URL失败:", error);
+        audioError.value = "获取歌曲URL失败";
+      });
+    }
+  }
+});
 
 // 更新UI状态
 function updatePlayButtonState() {

@@ -237,7 +237,7 @@ function navigateToAlbum(id: number) {
 }
 
 // 播放歌曲
-function playSong(song: any) {
+async function playSong(song: any) {
   console.log('点击播放歌曲:', song.name, song.id);
   // 确保歌曲对象包含必要的信息
   if (!song || !song.id) {
@@ -258,6 +258,14 @@ function playSong(song: any) {
     
     console.log('播放列表已设置，当前歌曲:', playerStore.currentSong?.name);
     console.log('当前播放状态:', playerStore.playing ? '播放中' : '已暂停');
+    
+    // 延迟检查播放状态，确保播放成功
+    setTimeout(() => {
+      if (!playerStore.playing) {
+        console.log('播放状态检查：仍为暂停状态，尝试再次切换');
+        playerStore.togglePlay();
+      }
+    }, 300);
   } catch (error) {
     console.error('播放歌曲出错:', error);
   }
