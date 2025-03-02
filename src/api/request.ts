@@ -4,7 +4,7 @@ import axios from 'axios'
 const request = axios.create({
   // 这里配置为网易云API代理服务器地址
   // 可以使用Vercel部署的网易云API或本地运行的API
-  baseURL: 'https://netease-cloud-music-api.vercel.app',
+  baseURL: 'https://netease-cloud-music-api-five-rho.vercel.app',
   timeout: 10000,
   withCredentials: true // 允许跨域携带cookie
 })
