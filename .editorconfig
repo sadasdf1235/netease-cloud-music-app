@@ -1,0 +1,26 @@
+ # EditorConfig is awesome: https://EditorConfig.org
+
+# 顶层配置，不再向上查找
+root = true
+
+# 所有文件的默认配置
+[*]
+charset = utf-8                 # 字符集为UTF-8
+end_of_line = lf                # 行尾使用LF
+indent_style = space            # 使用空格进行缩进
+indent_size = 2                 # 缩进大小为2个空格
+insert_final_newline = true     # 文件末尾插入空行
+trim_trailing_whitespace = true # 去除行尾空白字符
+
+# Markdown文件特殊配置
+[*.md]
+# Markdown中尾随空格有特殊意义
+trim_trailing_whitespace = false
+
+# 维持package.json的格式
+[package.json]
+insert_final_newline = false
+
+# Windows批处理文件使用CRLF
+[*.{cmd,bat}]
+end_of_line = crlf
