@@ -191,14 +191,20 @@ const audioError = ref<string | null>(null);
 const isMuted = ref(false);
 const showPlaylistPanel = ref(false);
 
-// 获取歌曲URL的函数
-async function getSongUrl(id: number): Promise<string> {
+/**
+ * 获取歌曲URL的函数
+ * @param id 歌曲ID
+ * @returns 返回歌曲的播放地址
+ * @description 首先尝试通过API获取歌曲URL，如果失败则使用备用URL
+ */
+ async function getSongUrl(id: number): Promise<string> {
   try {
     // 使用项目中的API模块获取歌曲URL
     console.log("开始获取歌曲URL, ID:", id);
     const response = await apiGetSongUrl(id);
     console.log("获取歌曲URL响应:", response);
     
+    // 正确处理API返回的数据结构
     if (response && response.data && response.data.length > 0) {
       const url = response.data[0].url;
       if (url) {
@@ -226,9 +232,24 @@ watch(
       
       try {
         // 获取真实播放地址
-        const url = await getSongUrl(newSong.id);
-        currentSongUrl.value = url;
-        console.log("设置歌曲URL:", currentSongUrl.value);
+        const response = await apiGetSongUrl(newSong.id);
+        
+        // 正确处理API返回的数据结构
+        if (response && response.data && response.data.length > 0) {
+          const url = response.data[0].url;
+          if (url) {
+            currentSongUrl.value = url;
+            console.log("获取到真实播放地址:", url);
+          } else {
+            // 如果API没有返回有效URL，使用备用方法
+            currentSongUrl.value = `https://music.163.com/song/media/outer/url?id=${newSong.id}.mp3`;
+            console.log("API未返回有效URL，使用备用URL:", currentSongUrl.value);
+          }
+        } else {
+          // 如果API没有返回有效数据，使用备用方法
+          currentSongUrl.value = `https://music.163.com/song/media/outer/url?id=${newSong.id}.mp3`;
+          console.log("API未返回有效数据，使用备用URL:", currentSongUrl.value);
+        }
         
         // 重置错误状态
         audioError.value = null;
@@ -245,16 +266,16 @@ watch(
               // 使用setTimeout确保浏览器有时间处理音频加载
               setTimeout(() => {
                 if (audioRef.value) {
-                  const playResult = audioRef.value.play();
-                  if (playResult) {
-                    playResult.catch(err => {
+                  const playPromise = audioRef.value.play();
+                  if (playPromise !== undefined) {
+                    playPromise.catch(err => {
                       console.error("自动播放失败:", err);
                       // 不显示alert，可能会阻碍用户体验
-                      console.log("需要用户交互才能播放音频");
+                      console.log("需要用户交互才能播放音频，请点击播放按钮");
                     });
                   }
                 }
-              }, 100);
+              }, 300);
             } catch (error) {
               console.error("播放出错:", error);
             }
@@ -263,6 +284,12 @@ watch(
       } catch (error) {
         console.error("设置歌曲URL失败:", error);
         audioError.value = "获取歌曲URL失败";
+        // 使用备用URL
+        currentSongUrl.value = `https://music.163.com/song/media/outer/url?id=${newSong.id}.mp3`;
+        if (audioRef.value) {
+          audioRef.value.src = currentSongUrl.value;
+          audioRef.value.load();
+        }
       }
     } else {
       console.log("当前没有选中的歌曲");
@@ -349,6 +376,7 @@ function onTimeUpdate(e: Event) {
   if (duration > 0) {
     const progress = (currentTime / duration) * 100;
     playerStore.setProgress(progress);
+    console.log("更新播放进度:", progress.toFixed(2) + "%");
   }
 }
 
@@ -462,12 +490,16 @@ function onError(e: Event) {
   }
 }
 
-// 播放/暂停切换
-function togglePlay() {
+/**
+ * 播放/暂停切换函数
+ * @description 处理播放和暂停状态的切换，包括错误处理和状态同步
+ */
+ function togglePlay() {
   console.log("切换播放状态");
   
   if (!audioRef.value) {
     console.error("音频元素不存在");
+    audioError.value = "播放器初始化失败，请刷新页面";
     return;
   }
   
@@ -480,24 +512,28 @@ function togglePlay() {
     // 当前是暂停状态
     if (!playerStore.currentSong) {
       console.log("当前没有选中的歌曲");
+      audioError.value = "请先选择要播放的歌曲";
       return;
     }
     
     // 确保audio元素的src已设置
-    if (!audioRef.value.src || audioRef.value.src !== currentSongUrl.value) {
+    if (!audioRef.value.src || audioRef.value.src === '' || !audioRef.value.src.includes(playerStore.currentSong.id.toString())) {
+      // 重置错误状态
+      audioError.value = null;
+      
       getSongUrl(playerStore.currentSong.id).then(url => {
         currentSongUrl.value = url;
         audioRef.value!.src = url;
         audioRef.value!.load();
         console.log("重新设置音频URL:", url);
         
+        // 先设置播放状态
+        playerStore.togglePlay(); // 设置为播放状态
+        
         // 开始播放
         console.log("开始播放");
         try {
           const playPromise = audioRef.value!.play();
-          
-          // 先设置播放状态
-          playerStore.togglePlay(); // 设置为播放状态
           
           if (playPromise !== undefined) {
             playPromise.catch(error => {
@@ -506,23 +542,63 @@ function togglePlay() {
               if (playerStore.playing) {
                 playerStore.togglePlay();
               }
+              // 显示错误信息
+              audioError.value = "播放失败，请再次点击播放按钮";
             });
           }
         } catch (error) {
           console.error("播放出错:", error);
+          audioError.value = "播放出错，请再次点击播放按钮";
+          // 恢复暂停状态
+          if (playerStore.playing) {
+            playerStore.togglePlay();
+          }
         }
       }).catch(error => {
         console.error("获取歌曲URL失败:", error);
-        audioError.value = "获取歌曲URL失败";
+        audioError.value = "获取歌曲URL失败，请检查网络连接";
+        // 使用备用URL
+        const backupUrl = `https://music.163.com/song/media/outer/url?id=${playerStore.currentSong.id}.mp3`;
+        currentSongUrl.value = backupUrl;
+        audioRef.value!.src = backupUrl;
+        audioRef.value!.load();
+        
+        // 先设置播放状态
+        playerStore.togglePlay(); // 设置为播放状态
+        
+        // 尝试播放
+        try {
+          const playPromise = audioRef.value!.play();
+          if (playPromise !== undefined) {
+            playPromise.catch(err => {
+              console.error("备用URL播放失败:", err);
+              // 如果播放失败，恢复暂停状态
+              if (playerStore.playing) {
+                playerStore.togglePlay();
+              }
+              audioError.value = "播放失败，可能需要用户交互";
+            });
+          }
+        } catch (err) {
+          console.error("备用URL播放出错:", err);
+          audioError.value = "播放出错，请稍后再试";
+          // 恢复暂停状态
+          if (playerStore.playing) {
+            playerStore.togglePlay();
+          }
+        }
       });
     } else {
+      // 重置错误状态
+      audioError.value = null;
+      
+      // 先设置播放状态
+      playerStore.togglePlay(); // 设置为播放状态
+      
       // 开始播放
       console.log("开始播放");
       try {
         const playPromise = audioRef.value.play();
-        
-        // 先设置播放状态
-        playerStore.togglePlay(); // 设置为播放状态
         
         if (playPromise !== undefined) {
           playPromise.catch(error => {
@@ -531,10 +607,17 @@ function togglePlay() {
             if (playerStore.playing) {
               playerStore.togglePlay();
             }
+            // 显示错误信息
+            audioError.value = "播放失败，请再次点击播放按钮";
           });
         }
       } catch (error) {
         console.error("播放出错:", error);
+        audioError.value = "播放出错，请再次点击播放按钮";
+        // 恢复暂停状态
+        if (playerStore.playing) {
+          playerStore.togglePlay();
+        }
       }
     }
   }
@@ -559,16 +642,24 @@ function toggleMute() {
 
 // 点击进度条事件
 function onProgressBarClick(e: MouseEvent) {
-  if (progressBarRef.value && playerStore.duration > 0) {
-    const rect = progressBarRef.value.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    // 设置进度
-    playerStore.setProgress(percent * 100);
-    // 同步到音频元素
-    if (audioRef.value) {
-      audioRef.value.currentTime = percent * playerStore.duration;
-    }
+  if (!progressBarRef.value || !audioRef.value || playerStore.duration <= 0) {
+    console.log("进度条点击无效：进度条元素不存在或音频未加载");
+    return;
   }
+  
+  const rect = progressBarRef.value.getBoundingClientRect();
+  const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  
+  // 设置进度
+  const newTime = percent * playerStore.duration;
+  console.log("点击进度条，设置新时间:", newTime, "秒，百分比:", (percent * 100).toFixed(2) + "%");
+  
+  // 更新播放器状态
+  playerStore.setProgress(percent * 100);
+  playerStore.updateCurrentTime(newTime);
+  
+  // 同步到音频元素
+  audioRef.value.currentTime = newTime;
 }
 
 // 切换播放列表面板
@@ -669,81 +760,7 @@ async function testPlayDirectly() {
   }
 }
 
-// 更新UI状态
-function updatePlayButtonState() {
-  console.log("手动更新UI状态");
-  // 确保组件响应性更新
-  if (playerStore.playing) {
-    console.log("当前状态为播放，尝试重新渲染");
-    playerStore.togglePlay();
-    setTimeout(() => {
-      playerStore.togglePlay();
-    }, 100);
-  } else {
-    console.log("当前状态为暂停，尝试重新渲染");
-    playerStore.togglePlay();
-    setTimeout(() => {
-      playerStore.togglePlay();
-    }, 100);
-  }
-}
 
-// 格式化时间
-function formatTime(time: number) {
-  if (isNaN(time)) return '00:00';
-  
-  const minutes = Math.floor(time / 60);
-  const seconds = Math.floor(time % 60);
-  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-// 组件挂载时初始化
-onMounted(() => {
-  console.log("Player组件已挂载");
-
-  // 初始化音频元素
-  if (audioRef.value) {
-    // 设置初始音量
-    audioRef.value.volume = playerStore.volume / 100;
-    console.log("设置初始音量:", playerStore.volume);
-
-    // 如果当前有歌曲，尝试加载
-    if (playerStore.currentSong) {
-      console.log("挂载时发现当前有歌曲:", playerStore.currentSong.name);
-      
-      // 获取URL并设置
-      getSongUrl(playerStore.currentSong.id).then(url => {
-        currentSongUrl.value = url;
-        console.log("获取到歌曲URL:", currentSongUrl.value);
-        
-        // 设置音频源
-        audioRef.value!.src = currentSongUrl.value;
-        audioRef.value!.load();
-        
-        // 如果状态是播放，尝试播放
-        if (playerStore.playing) {
-          console.log("状态为播放，尝试播放");
-          
-          // 延迟一点播放，确保URL已设置
-          setTimeout(() => {
-            if (audioRef.value) {
-              const playPromise = audioRef.value.play();
-              if (playPromise !== undefined) {
-                playPromise.catch(error => {
-                  console.error("初始播放失败:", error);
-                  console.log("需要用户交互才能播放音频，请点击播放按钮");
-                });
-              }
-            }
-          }, 500);
-        }
-      }).catch(error => {
-        console.error("获取歌曲URL失败:", error);
-        audioError.value = "获取歌曲URL失败";
-      });
-    }
-  }
-});
 
 // 更新UI状态
 function updatePlayButtonState() {
