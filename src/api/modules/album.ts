@@ -2,64 +2,95 @@
  * 专辑相关API
  * @description 包含专辑详情、新专辑等接口
  */
-import { get } from '../request';
-import { withCache } from '@/utils/apiCache';
+import request from '@/utils/request';
+import type { Album, AlbumDetail, AlbumDynamic, NewAlbumParams } from '@/types/album';
+import type { Song } from '@/types/song';
+
+interface BaseResponse {
+  code: number;
+}
+
+interface AlbumDetailResponse extends BaseResponse {
+  code: number;
+  album: Album;
+  songs: Song[];
+}
+
+interface AlbumDynamicResponse extends BaseResponse {
+  code: number;
+  data: AlbumDynamic;
+}
+
+interface NewAlbumsResponse extends BaseResponse {
+  code: number;
+  albums: Album[];
+  total: number;
+}
+
+interface ArtistAlbumsResponse extends BaseResponse {
+  code: number;
+  hotAlbums: Album[];
+  more: boolean;
+}
 
 /**
  * 获取专辑详情
- * @param id 专辑id
- * @param useCache 是否使用缓存，默认为true
- * @returns Promise<any> 专辑详情数据
+ * @param id 专辑ID
  */
-export function getAlbumDetail(id: number, useCache = true) {
-  const apiCall = () => get('/album', { id });
-  return useCache
-    ? withCache(apiCall, `album_detail_${id}`, 24 * 60 * 60 * 1000) // 缓存24小时
-    : apiCall();
-}
-
-/**
- * 获取新碟上架
- * @param limit 取出数量，默认为30
- * @param offset 偏移数量，用于分页，默认为0
- * @param area 地区类型 ALL:全部,ZH:华语,EA:欧美,KR:韩国,JP:日本
- * @param useCache 是否使用缓存，默认为true
- * @returns Promise<any> 新碟上架数据
- */
-export function getNewAlbums(limit = 30, offset = 0, area = 'ALL', useCache = true) {
-  const apiCall = () => get('/album/new', { limit, offset, area });
-  return useCache
-    ? withCache(apiCall, `new_albums_${area}_${limit}_${offset}`, 12 * 60 * 60 * 1000) // 缓存12小时
-    : apiCall();
-}
+export const getAlbumDetail = (id: number): Promise<AlbumDetailResponse> => {
+  return request.get<AlbumDetailResponse>('/album', { params: { id } });
+};
 
 /**
  * 获取专辑动态信息
- * @param id 专辑id
- * @returns Promise<any> 专辑动态信息
+ * @param id 专辑ID
  */
-export function getAlbumDynamic(id: number) {
-  return get('/album/detail/dynamic', { id });
-}
+export const getAlbumDynamic = (id: number): Promise<AlbumDynamicResponse> => {
+  return request.get<AlbumDynamicResponse>('/album/detail/dynamic', { params: { id } });
+};
 
 /**
  * 收藏/取消收藏专辑
- * @param id 专辑id
- * @param t 操作类型，1为收藏，其他为取消收藏
- * @returns Promise<any> 操作结果
+ * @param id 专辑ID
+ * @param t 1:收藏 2:取消收藏
  */
-export function subscribeAlbum(id: number, t: 1 | 0) {
-  return get('/album/sub', { id, t });
-}
+export const subscribeAlbum = (id: number, t: 1 | 2): Promise<BaseResponse> => {
+  return request.get<BaseResponse>('/album/sub', { params: { id, t } });
+};
+
+/**
+ * 获取新专辑
+ * @param params 筛选参数
+ */
+export const getNewAlbums = (params?: NewAlbumParams): Promise<NewAlbumsResponse> => {
+  return request.get<NewAlbumsResponse>('/album/new', { params });
+};
+
+/**
+ * 获取全部新专辑
+ * @param params 筛选参数
+ */
+export const getAllNewAlbums = (params?: NewAlbumParams): Promise<NewAlbumsResponse> => {
+  return request.get<NewAlbumsResponse>('/album/newest', { params });
+};
 
 /**
  * 获取专辑评论
- * @param id 专辑id
- * @param limit 取出数量，默认为20
- * @param offset 偏移数量，用于分页，默认为0
- * @param before 分页参数，上一页最后一项的time
- * @returns Promise<any> 专辑评论数据
+ * @param id 专辑ID
+ * @param limit 返回数量
+ * @param offset 偏移数量
+ * @param before 分页参数,取上一页最后一项的 time 获取下一页数据
  */
-export function getAlbumComments(id: number, limit = 20, offset = 0, before?: number) {
-  return get('/comment/album', { id, limit, offset, before });
-}
+export const getAlbumComments = (id: number, limit = 20, offset = 0, before?: number): Promise<BaseResponse> => {
+  return request.get<BaseResponse>('/comment/album', { params: { id, limit, offset, before } });
+};
+
+/**
+ * 获取歌手专辑
+ * @param id 歌手ID
+ * @param limit 返回数量
+ * @param offset 偏移数量
+ */
+export const getArtistAlbums = (id: number, limit = 30, offset = 0): Promise<ArtistAlbumsResponse> => {
+  return request.get<ArtistAlbumsResponse>('/artist/album', { params: { id, limit, offset } });
+};

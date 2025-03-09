@@ -7,15 +7,23 @@
 export { default as request, get, post } from './request';
 
 // 导出API模块
-export * from './modules/song';
-export * from './modules/playlist';
-export * from './modules/artist';
-export * from './modules/album';
+import * as albumApi from './modules/album';
+import * as artistApi from './modules/artist';
+import * as commentApi from './modules/comment';
+import * as playlistApi from './modules/playlist';
+import * as searchApi from './modules/search';
+import * as songApi from './modules/song';
+import * as userApi from './modules/user';
 
-// 导出基础功能模块
-export * from './modules/search';
-export * from './modules/user';
-export * from './modules/comment';
+export {
+  albumApi,
+  artistApi,
+  commentApi,
+  playlistApi,
+  searchApi,
+  songApi,
+  userApi
+};
 
 /**
  * 获取首页轮播图

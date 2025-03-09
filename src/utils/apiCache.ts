@@ -1,112 +1,146 @@
- /**
+/**
  * API缓存工具
- * @description 用于缓存API请求结果，提高性能
+ * @description 提供API请求缓存功能，减少重复请求
  */
-import { getStorage, setStorage, removeStorage } from './storage';
 
-/**
- * 缓存项接口
- */
 interface CacheItem<T> {
-  /** 缓存数据 */
   data: T;
-  /** 过期时间戳 */
-  expiry: number;
+  timestamp: number;
+  expires: number;
 }
 
-/** 缓存键前缀 */
-const CACHE_PREFIX = 'api_cache_';
-
-/** 默认缓存时间（5分钟） */
-const DEFAULT_CACHE_TIME = 5 * 60 * 1000;
-
-/**
- * 设置API缓存
- * @param key 缓存键
- * @param data 缓存数据
- * @param expireTime 过期时间（毫秒）
- */
-export function setApiCache<T>(key: string, data: T, expireTime = DEFAULT_CACHE_TIME): void {
-  const cacheKey = `${CACHE_PREFIX}${key}`;
-  const cacheItem: CacheItem<T> = {
-    data,
-    expiry: Date.now() + expireTime
-  };
-
-  setStorage(cacheKey, cacheItem);
+interface CacheOptions {
+  /** 缓存时间（毫秒） */
+  expires?: number;
+  /** 是否强制刷新 */
+  forceRefresh?: boolean;
 }
 
-/**
- * 获取API缓存
- * @param key 缓存键
- * @returns 缓存数据，如果不存在或已过期则返回null
- */
-export function getApiCache<T>(key: string): T | null {
-  const cacheKey = `${CACHE_PREFIX}${key}`;
-  const cacheItem = getStorage<CacheItem<T>>(cacheKey);
+class ApiCache {
+  private cache: Map<string, CacheItem<any>>;
+  private defaultExpires: number;
 
-  // 检查缓存是否存在且未过期
-  if (cacheItem && cacheItem.expiry > Date.now()) {
-    return cacheItem.data;
+  constructor(defaultExpires: number = 5 * 60 * 1000) { // 默认5分钟
+    this.cache = new Map();
+    this.defaultExpires = defaultExpires;
   }
 
-  // 如果缓存已过期，清除它
-  if (cacheItem) {
-    removeStorage(cacheKey);
+  /**
+   * 生成缓存键
+   * @param key 基础键名
+   * @param params 请求参数
+   * @returns 缓存键
+   */
+  private generateKey(key: string, params?: Record<string, any>): string {
+    if (!params) return key;
+    return `${key}:${JSON.stringify(params)}`;
   }
 
-  return null;
-}
+  /**
+   * 检查缓存是否过期
+   * @param item 缓存项
+   * @returns 是否过期
+   */
+  private isExpired(item: CacheItem<any>): boolean {
+    return Date.now() - item.timestamp > item.expires;
+  }
 
-/**
- * 删除API缓存
- * @param key 缓存键
- */
-export function removeApiCache(key: string): void {
-  const cacheKey = `${CACHE_PREFIX}${key}`;
-  removeStorage(cacheKey);
-}
+  /**
+   * 设置缓存
+   * @param key 缓存键
+   * @param data 数据
+   * @param options 缓存选项
+   */
+  set<T>(key: string, data: T, options: CacheOptions = {}): void {
+    const cacheKey = this.generateKey(key, options);
+    const expires = options.expires || this.defaultExpires;
 
-/**
- * 清除所有API缓存
- */
-export function clearApiCache(): void {
-  try {
-    // 获取所有localStorage键
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(CACHE_PREFIX)) {
-        localStorage.removeItem(key);
+    this.cache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+      expires,
+    });
+  }
+
+  /**
+   * 获取缓存
+   * @param key 缓存键
+   * @param params 请求参数
+   * @returns 缓存数据或undefined
+   */
+  get<T>(key: string, params?: Record<string, any>): T | undefined {
+    const cacheKey = this.generateKey(key, params);
+    const item = this.cache.get(cacheKey);
+
+    if (!item) return undefined;
+    if (this.isExpired(item)) {
+      this.cache.delete(cacheKey);
+      return undefined;
+    }
+
+    return item.data;
+  }
+
+  /**
+   * 删除缓存
+   * @param key 缓存键
+   * @param params 请求参数
+   */
+  delete(key: string, params?: Record<string, any>): void {
+    const cacheKey = this.generateKey(key, params);
+    this.cache.delete(cacheKey);
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  clear(): void {
+    this.cache.clear();
+  }
+
+  /**
+   * 清除过期缓存
+   */
+  clearExpired(): void {
+    for (const [key, item] of this.cache.entries()) {
+      if (this.isExpired(item)) {
+        this.cache.delete(key);
       }
     }
-  } catch (error) {
-    console.error('清除API缓存失败', error);
   }
 }
+
+// 创建全局缓存实例
+const apiCache = new ApiCache();
 
 /**
- * 带缓存的API请求包装器
- * @param apiCall API调用函数
- * @param cacheKey 缓存键
- * @param cacheTime 缓存时间（毫秒）
- * @returns API调用结果
+ * 缓存装饰器
+ * @param key 缓存键
+ * @param options 缓存选项
  */
-export async function withCache<T>(
-  apiCall: () => Promise<T>,
-  cacheKey: string,
-  cacheTime = DEFAULT_CACHE_TIME
-): Promise<T> {
-  // 尝试从缓存获取数据
-  const cachedData = getApiCache<T>(cacheKey);
-  if (cachedData) {
-    return cachedData;
-  }
+export function withCache<T>(
+  key: string,
+  options: CacheOptions = {}
+): (target: () => Promise<T>) => Promise<T> {
+  return async (target: () => Promise<T>) => {
+    // 如果强制刷新，直接请求
+    if (options.forceRefresh) {
+      const data = await target();
+      apiCache.set(key, data, options);
+      return data;
+    }
 
-  // 如果没有缓存，调用API
-  const data = await apiCall();
+    // 尝试从缓存获取
+    const cached = apiCache.get<T>(key);
+    if (cached !== undefined) {
+      return cached;
+    }
 
-  // 缓存结果
-  setApiCache(cacheKey, data, cacheTime);
-
-  return data;
+    // 缓存未命中，发起请求
+    const data = await target();
+    apiCache.set(key, data, options);
+    return data;
+  };
 }
+
+export default apiCache;
