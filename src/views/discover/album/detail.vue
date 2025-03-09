@@ -115,6 +115,13 @@
         :resource-type="3"
       />
     </div>
+
+    <!-- 分享弹窗 -->
+    <ShareModal
+      v-model:show="showShareModal"
+      :title="albumDetail.album?.name || ''"
+      :link="shareLink"
+    />
   </div>
 </template>
 
@@ -127,6 +134,7 @@ import { getAlbumDetail, getRelatedAlbums } from '@/api/album';
 import MusicList from '@/components/common/MusicList.vue';
 import AlbumCard from '@/components/common/AlbumCard.vue';
 import CommentSection from '@/components/common/CommentSection.vue';
+import ShareModal from '@/components/common/ShareModal.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -147,6 +155,15 @@ const showFullDesc = ref(false);
 const albumDetail = ref<any>({});
 // 相关专辑
 const relatedAlbums = ref<any[]>([]);
+
+// 显示分享弹窗
+const showShareModal = ref(false);
+
+// 获取分享链接
+const shareLink = computed(() => {
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/album/${albumId.value}`;
+});
 
 /**
  * 格式化日期
@@ -184,7 +201,7 @@ function toggleCollect() {
  * 分享专辑
  */
 function shareAlbum() {
-  message.info('分享功能开发中');
+  showShareModal.value = true;
 }
 
 /**
@@ -302,3 +319,7 @@ onMounted(() => {
   }
 });
 </script>
+
+<style scoped>
+/* ... existing styles ... */
+</style>
