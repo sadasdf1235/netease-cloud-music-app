@@ -1,81 +1,72 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-
-export interface UserProfile {
-  userId: number
-  nickname: string
-  avatarUrl: string
-  backgroundUrl?: string
-  signature?: string
-  level?: number
-  vipType?: number
-}
+import type { UserProfile } from '@/types/user'
+import { login, logout, getUserProfile } from '@/api/user'
+import { STORAGE_KEY } from '@/constants/storage'
 
 export const useUserStore = defineStore('user', () => {
-  // 用户登录状态
-  const isLoggedIn = ref(false)
-  // 用户信息
+  // 状态
+  const token = ref<string>(localStorage.getItem(STORAGE_KEY.TOKEN) || '')
   const profile = ref<UserProfile | null>(null)
-  // 用户cookie
-  const cookie = ref('')
-  
-  // 计算属性：用户ID
-  const userId = computed(() => profile.value?.userId || 0)
-  
-  // 设置登录状态和用户信息
-  function setLoginState(loginState: boolean, userProfile: UserProfile | null = null, userCookie: string = '') {
-    isLoggedIn.value = loginState
-    profile.value = userProfile
-    cookie.value = userCookie
-    
-    // 保存到本地存储
-    if (loginState && userProfile) {
-      localStorage.setItem('user_profile', JSON.stringify(userProfile))
-      localStorage.setItem('user_cookie', userCookie)
-    } else {
-      localStorage.removeItem('user_profile')
-      localStorage.removeItem('user_cookie')
+  const isLoggedIn = computed(() => !!token.value)
+
+  // 登录
+  const loginAction = async (phone: string, password: string) => {
+    try {
+      const res = await login(phone, password)
+      token.value = res.token
+      localStorage.setItem(STORAGE_KEY.TOKEN, res.token)
+      await getProfile()
+      return true
+    } catch (error) {
+      console.error('登录失败:', error)
+      return false
     }
   }
-  
-  // 从本地存储恢复登录状态
-  function restoreLoginState() {
-    const storedProfile = localStorage.getItem('user_profile')
-    const storedCookie = localStorage.getItem('user_cookie')
-    
-    if (storedProfile && storedCookie) {
-      try {
-        const userProfile = JSON.parse(storedProfile) as UserProfile
-        setLoginState(true, userProfile, storedCookie)
-        return true
-      } catch (e) {
-        console.error('Failed to parse stored user profile', e)
-      }
-    }
-    return false
-  }
-  
-  // 登出
-  function logout() {
-    setLoginState(false)
-  }
-  
-  // 更新用户信息
-  function updateProfile(userProfile: Partial<UserProfile>) {
-    if (profile.value) {
-      profile.value = { ...profile.value, ...userProfile }
-      localStorage.setItem('user_profile', JSON.stringify(profile.value))
+
+  // 退出登录
+  const logoutAction = async () => {
+    try {
+      await logout()
+      token.value = ''
+      profile.value = null
+      localStorage.removeItem(STORAGE_KEY.TOKEN)
+      return true
+    } catch (error) {
+      console.error('退出登录失败:', error)
+      return false
     }
   }
-  
+
+  // 获取用户信息
+  const getProfile = async () => {
+    try {
+      if (!token.value) return null
+      const data = await getUserProfile()
+      profile.value = data
+      return data
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      return null
+    }
+  }
+
+  // 初始化
+  const initialize = async () => {
+    if (token.value) {
+      await getProfile()
+    }
+  }
+
   return {
-    isLoggedIn,
+    // 状态
+    token,
     profile,
-    cookie,
-    userId,
-    setLoginState,
-    restoreLoginState,
-    logout,
-    updateProfile
+    isLoggedIn,
+    // 方法
+    login: loginAction,
+    logout: logoutAction,
+    getProfile,
+    initialize,
   }
 })
