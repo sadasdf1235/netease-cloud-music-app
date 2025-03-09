@@ -1,170 +1,110 @@
-import request from './request'
+/**
+ * 音乐相关API
+ * @description 包含各种音乐相关功能的接口
+ */
+import { get } from './request';
+import { withCache } from '@/utils/apiCache';
+
+// 导入其他API模块
+import * as SongAPI from './modules/song';
+import * as PlaylistAPI from './modules/playlist';
+import * as AlbumAPI from './modules/album';
+import * as ArtistAPI from './modules/artist';
+
+// 重新导出模块API
+export * from './modules/song';
+export * from './modules/playlist';
+export * from './modules/album';
+export * from './modules/artist';
 
 /**
  * 获取首页轮播图
  * @param type 资源类型: 0-PC, 1-Android, 2-iPhone, 3-iPad
+ * @returns 轮播图数据
  */
 export function getBanners(type = 0) {
-  return request({
-    url: '/banner',
-    method: 'get',
-    params: { type }
-  })
+  return get('/banner', { type });
 }
 
 /**
  * 获取推荐歌单
  * @param limit 取出数量，默认为30
+ * @returns Promise<any> 推荐歌单数据
  */
 export function getRecommendPlaylists(limit = 30) {
-  return request({
-    url: '/personalized',
-    method: 'get',
-    params: { limit }
-  })
+  return get('/personalized', { limit });
 }
 
 /**
- * 获取歌单详情
- * @param id 歌单id
+ * 获取新歌推荐
+ * @param limit 取出数量，默认为10
+ * @returns Promise<any> 新歌推荐数据
  */
-export function getPlaylistDetail(id: number) {
-  return request({
-    url: '/playlist/detail',
-    method: 'get',
-    params: { id }
-  })
-}
-
-/**
- * 获取歌单所有歌曲
- * @param id 歌单id
- * @param limit 限制获取歌曲的数量
- * @param offset 偏移数量，用于分页
- */
-export function getPlaylistTracks(id: number, limit = 30, offset = 0) {
-  return request({
-    url: '/playlist/track/all',
-    method: 'get',
-    params: { id, limit, offset }
-  })
-}
-
-/**
- * 获取新歌速递
- * @param type 地区类型 全部:0 华语:7 欧美:96 日本:8 韩国:16
- */
-export function getNewSongs(type = 0) {
-  return request({
-    url: '/top/song',
-    method: 'get',
-    params: { type }
-  })
+export function getNewSongs(limit = 10) {
+  return get('/personalized/newsong', { limit });
 }
 
 /**
  * 获取新碟上架
- * @param limit 取出数量，默认为30
- * @param offset 偏移数量，用于分页
+ * @param area 地区类型 ALL:全部,ZH:华语,EA:欧美,KR:韩国,JP:日本
+ * @param limit 取出数量，默认为10
+ * @returns Promise<any> 新碟上架数据
  */
-export function getNewAlbums(limit = 30, offset = 0) {
-  return request({
-    url: '/album/new',
-    method: 'get',
-    params: { limit, offset }
-  })
+export function getNewAlbums(limit = 10, area = 'ALL') {
+  return AlbumAPI.getNewAlbums(limit, 0, area);
 }
 
 /**
  * 获取热门歌手
- * @param limit 取出数量，默认为30
- * @param offset 偏移数量，用于分页
+ * @param limit 取出数量，默认为6
+ * @returns Promise<any> 热门歌手数据
  */
-export function getHotArtists(limit = 30, offset = 0) {
-  return request({
-    url: '/top/artists',
-    method: 'get',
-    params: { limit, offset }
-  })
+export function getHotArtists(limit = 6) {
+  return ArtistAPI.getTopArtists(limit);
+}
+
+/**
+ * 获取歌曲URL
+ * @param id 歌曲id，支持多个id，用逗号分隔
+ * @returns Promise<any> 歌曲URL数据
+ */
+export function getSongUrl(id: number | string) {
+  return get('/song/url', { id });
 }
 
 /**
  * 获取歌曲详情
  * @param ids 歌曲id，支持多个id，用逗号分隔
+ * @returns Promise<any> 歌曲详情数据
  */
-export function getSongDetail(ids: string) {
-  return request({
-    url: '/song/detail',
-    method: 'get',
-    params: { ids }
-  })
-}
-
-/**
- * 获取歌曲URL
- * @param id 歌曲ID
- * @param level 音质等级
- * @returns Promise
- */
-export function getSongUrl(id: number, br: number = 320000) {
-  console.log('调用 getSongUrl API, 歌曲ID:', id, '比特率:', br);
-  
-  // 新版API改用了level参数代替br参数
-  // exhigh: 极高 (320kbps) 
-  // lossless: 无损
-  // hires: Hi-Res
-  // standard: 标准 (128kbps)
-  // higher: 较高 (192kbps)
-  const level = br >= 320000 ? 'exhigh' : (br >= 192000 ? 'higher' : 'standard');
-  
-  // 添加时间戳避免缓存问题
-  const timestamp = Date.now();
-  
-  return request({
-    url: '/song/url/v1',  // 使用新版API
-    method: 'get',
-    params: { 
-      id, 
-      level,
-      timestamp
-    }
-  });
-}
-
-/**
- * 获取歌曲详情，可传入多首
- * @param ids 
- * @returns 
- */
-export function getSongsDetail(ids: string) {
-  return request({
-    url: '/song/detail',
-    method: 'get',
-    params: {
-      ids,
-      timestamp: Date.now()
-    }
-  });
+export function getSongDetail(ids: number | number[] | string) {
+  // 如果传入的是数组，则转为逗号分隔的字符串
+  const idsStr = Array.isArray(ids) ? ids.join(',') : ids.toString();
+  return get('/song/detail', { ids: idsStr });
 }
 
 /**
  * 获取歌词
  * @param id 歌曲id
+ * @returns Promise<any> 歌词数据
  */
 export function getLyric(id: number) {
-  return request({
-    url: '/lyric',
-    method: 'get',
-    params: { id }
-  })
+  return get('/lyric', { id });
 }
 
 /**
- * 获取排行榜列表
+ * 获取相似歌曲
+ * @param id 歌曲id
+ * @returns Promise<any> 相似歌曲数据
  */
-export function getTopLists() {
-  return request({
-    url: '/toplist',
-    method: 'get'
-  })
+export function getSimiSongs(id: number) {
+  return get('/simi/song', { id });
+}
+
+/**
+ * 获取热门搜索
+ * @returns Promise<any> 热门搜索数据
+ */
+export function getSearchHot() {
+  return get('/search/hot');
 }

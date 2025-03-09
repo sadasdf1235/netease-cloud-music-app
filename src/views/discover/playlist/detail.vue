@@ -20,7 +20,7 @@
           </div>
         </template>
       </div>
-      
+
       <div class="flex-1">
         <div v-if="loading">
           <div class="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
@@ -31,11 +31,11 @@
         <template v-else>
           <h1 class="text-2xl font-bold mb-2">{{ playlistInfo.name }}</h1>
           <div class="flex items-center text-sm text-gray-500 mb-4">
-            <img 
-              v-if="playlistInfo.creator" 
-              :src="playlistInfo.creator.avatarUrl + '?param=30y30'" 
-              class="w-6 h-6 rounded-full mr-2" 
-              :alt="playlistInfo.creator.nickname" 
+            <img
+              v-if="playlistInfo.creator"
+              :src="playlistInfo.creator.avatarUrl + '?param=30y30'"
+              class="w-6 h-6 rounded-full mr-2"
+              :alt="playlistInfo.creator.nickname"
             />
             <span v-if="playlistInfo.creator" class="mr-4">{{ playlistInfo.creator.nickname }}</span>
             <div class="flex items-center">
@@ -43,31 +43,31 @@
               <span>创建于 {{ formatDate(playlistInfo.createTime) }}</span>
             </div>
           </div>
-          
+
           <div class="flex flex-wrap items-center gap-2 mb-3">
             <span v-for="tag in playlistInfo.tags" :key="tag" class="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-dark-800">
               {{ tag }}
             </span>
             <span v-if="!playlistInfo.tags || playlistInfo.tags.length === 0" class="text-xs text-gray-500">暂无标签</span>
           </div>
-          
+
           <div class="text-sm text-gray-600 dark:text-gray-400 mb-4" :class="{'line-clamp-2': !showFullDesc}">
             {{ playlistInfo.description || '暂无简介' }}
           </div>
           <div v-if="playlistInfo.description && playlistInfo.description.length > 100" class="text-xs text-primary cursor-pointer mb-4" @click="showFullDesc = !showFullDesc">
             {{ showFullDesc ? '收起' : '显示全部' }}
           </div>
-          
+
           <div class="flex flex-wrap items-center gap-3">
-            <button 
+            <button
               class="px-6 py-2 rounded-full bg-primary text-white flex items-center gap-1"
               @click="playAll"
             >
               <div class="i-carbon-play-filled"></div>
               <span>播放全部</span>
             </button>
-            <button 
-              class="icon-btn" 
+            <button
+              class="icon-btn"
               :class="{'text-red-500': isCollected}"
               @click="toggleCollect"
             >
@@ -83,90 +83,21 @@
         </template>
       </div>
     </div>
-    
+
     <!-- 歌曲列表 -->
     <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2">
-        <h2 class="text-lg font-medium">歌曲列表 <span class="text-gray-500 text-sm">{{ playlistInfo.trackCount || 0 }}首歌</span></h2>
-        <div class="flex items-center gap-2 w-full sm:w-auto">
-          <input 
-            v-model="searchKeyword" 
-            type="text" 
-            placeholder="搜索歌单音乐" 
-            class="px-3 py-1 text-sm rounded-full bg-gray-100 dark:bg-dark-800 focus:outline-none focus:ring-1 focus:ring-primary w-full sm:w-auto"
-          />
-        </div>
-      </div>
-      
-      <!-- 加载状态 -->
-      <div v-if="loading" class="space-y-2">
-        <div v-for="i in 10" :key="i" class="flex items-center p-3 rounded-md">
-          <div class="w-6 text-center text-gray-400 mr-4">{{ i }}</div>
-          <div class="flex-1 min-w-0">
-            <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2 w-48"></div>
-            <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"></div>
-          </div>
-          <div class="w-32 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-          <div class="w-16 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ml-4"></div>
-        </div>
-      </div>
-      
-      <!-- 歌曲列表内容 -->
-      <div v-else-if="filteredTracks.length > 0" class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="border-b border-gray-200 dark:border-gray-700">
-            <tr>
-              <th class="py-3 text-left w-16">#</th>
-              <th class="py-3 text-left">歌曲</th>
-              <th class="py-3 text-left">歌手</th>
-              <th class="py-3 text-left hidden md:table-cell">专辑</th>
-              <th class="py-3 text-left w-24">时长</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr 
-              v-for="(track, index) in filteredTracks" 
-              :key="track.id" 
-              class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-800 cursor-pointer group"
-              @dblclick="playSong(index)"
-            >
-              <td class="py-3 px-2">
-                <div class="flex items-center justify-between">
-                  <span class="group-hover:hidden">{{ index + 1 }}</span>
-                  <div 
-                    class="i-carbon-play text-gray-400 hover:text-primary cursor-pointer hidden group-hover:block"
-                    @click="playSong(index)"
-                  ></div>
-                </div>
-              </td>
-              <td class="py-3">
-                <div class="flex items-center">
-                  <img 
-                    v-if="track.al?.picUrl" 
-                    :src="track.al.picUrl + '?param=40y40'" 
-                    class="w-10 h-10 rounded mr-3 hidden md:block" 
-                    :alt="track.name" 
-                  />
-                  <div>
-                    <div class="font-medium">{{ track.name }}</div>
-                    <div v-if="track.alia && track.alia.length > 0" class="text-xs text-gray-500">{{ track.alia[0] }}</div>
-                  </div>
-                </div>
-              </td>
-              <td class="py-3 text-gray-600 dark:text-gray-400">{{ formatArtists(track.ar) }}</td>
-              <td class="py-3 text-gray-600 dark:text-gray-400 truncate max-w-40 hidden md:table-cell">{{ track.al?.name }}</td>
-              <td class="py-3 text-gray-500">{{ formatDuration(track.dt) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      
-      <!-- 空状态 -->
-      <div v-else class="py-16 text-center text-gray-500">
-        <div class="i-carbon-music-note text-5xl mx-auto mb-4"></div>
-        <p v-if="searchKeyword">没有找到匹配"{{ searchKeyword }}"的歌曲</p>
-        <p v-else>歌单中暂无歌曲</p>
-      </div>
+      <MusicList
+        :tracks="tracks"
+        :loading="loading"
+        :show-search="true"
+        :show-count="true"
+        :search-placeholder="'搜索歌单音乐'"
+        :empty-text="'歌单中暂无歌曲'"
+        @play="playSongFromList"
+        @add-to-playlist="addToPlaylist"
+        @toggle-like="toggleLike"
+        @more-actions="showMoreActions"
+      />
     </div>
   </div>
 </template>
@@ -177,6 +108,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { getPlaylistDetail, getPlaylistTracks } from '@/api/music'
 import { useMessage } from 'naive-ui'
+import MusicList from '@/components/common/MusicList.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -224,10 +156,10 @@ const searchKeyword = ref('')
  */
 const filteredTracks = computed(() => {
   if (!searchKeyword.value) return tracks.value
-  
+
   const keyword = searchKeyword.value.toLowerCase()
   return tracks.value.filter(track => {
-    return track.name.toLowerCase().includes(keyword) || 
+    return track.name.toLowerCase().includes(keyword) ||
            formatArtists(track.ar).toLowerCase().includes(keyword) ||
            (track.al?.name && track.al.name.toLowerCase().includes(keyword))
   })
@@ -287,7 +219,7 @@ function playAll() {
     message.warning('歌单中没有歌曲')
     return
   }
-  
+
   // 将歌曲列表转换为播放器需要的格式
   const songList = tracks.value.map(track => ({
     id: track.id,
@@ -300,34 +232,58 @@ function playAll() {
     },
     duration: track.dt
   }))
-  
+
   playerStore.setPlaylist(songList)
   playerStore.play(0)
   message.success('已开始播放全部歌曲')
 }
 
 /**
- * 播放单曲
- * @param index 歌曲在列表中的索引
+ * 从列表中播放歌曲
+ * @param data 包含歌曲和索引的对象
  */
-function playSong(index) {
-  if (index < 0 || index >= tracks.value.length) return
-  
-  // 将歌曲列表转换为播放器需要的格式
-  const songList = tracks.value.map(track => ({
-    id: track.id,
-    name: track.name,
-    artists: track.ar,
-    album: {
-      id: track.al?.id,
-      name: track.al?.name,
-      picUrl: track.al?.picUrl
-    },
-    duration: track.dt
-  }))
-  
-  playerStore.setPlaylist(songList)
-  playerStore.play(index)
+function playSongFromList(data: { track: any, index: number }) {
+  // 设置播放列表为当前显示的歌单
+  playerStore.setPlaylist(tracks.value);
+  // 播放选中的歌曲
+  playerStore.play(data.index);
+}
+
+/**
+ * 添加歌曲到播放列表
+ * @param track 歌曲对象
+ */
+function addToPlaylist(track: any) {
+  // 检查歌曲是否已在播放列表中
+  const existingIndex = playerStore.playlist.findIndex((item: any) => item.id === track.id);
+
+  if (existingIndex === -1) {
+    // 添加到播放列表
+    const newPlaylist = [...playerStore.playlist, track];
+    playerStore.setPlaylist(newPlaylist);
+    message.success('已添加到播放列表');
+  } else {
+    message.info('歌曲已在播放列表中');
+  }
+}
+
+/**
+ * 切换歌曲喜欢状态
+ * @param track 歌曲对象
+ */
+function toggleLike(track: any) {
+  // 这里应该调用API来喜欢/取消喜欢歌曲
+  // 由于API未实现，这里只做提示
+  message.success(`${track.name} 已添加到我喜欢的音乐`);
+}
+
+/**
+ * 显示更多操作
+ * @param track 歌曲对象
+ */
+function showMoreActions(track: any) {
+  // 这里可以显示一个操作菜单，如下载、分享等
+  message.info('更多操作功能开发中');
 }
 
 /**
@@ -369,7 +325,7 @@ function downloadPlaylist() {
 async function fetchPlaylistDetail() {
   try {
     loading.value = true
-    
+
     // 获取歌单基本信息
     const detailRes = await getPlaylistDetail(playlistId.value)
     if (detailRes.playlist) {
@@ -377,7 +333,7 @@ async function fetchPlaylistDetail() {
     } else {
       message.error('获取歌单信息失败')
     }
-    
+
     // 获取歌单歌曲
     const tracksRes = await getPlaylistTracks(playlistId.value)
     if (tracksRes.songs) {
@@ -385,7 +341,7 @@ async function fetchPlaylistDetail() {
     } else {
       message.warning('获取歌曲列表失败')
     }
-    
+
     loading.value = false
   } catch (error) {
     console.error('获取歌单详情失败:', error)

@@ -82,110 +82,17 @@
       </div>
 
       <!-- 歌曲列表 -->
-      <div class="overflow-x-auto">
-        <table class="w-full">
-          <thead class="border-b border-gray-200 dark:border-gray-700">
-            <tr>
-              <th class="py-3 text-left w-16">#</th>
-              <th class="py-3 text-left">歌曲</th>
-              <th class="py-3 text-left">专辑</th>
-              <th class="py-3 text-left w-24">时长</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template v-if="loading">
-              <tr
-                v-for="i in 10"
-                :key="i"
-                class="border-b border-gray-100 dark:border-gray-800"
-              >
-                <td class="py-3 px-2">
-                  <div class="flex items-center justify-between">
-                    <span :class="{ 'text-primary font-medium': i <= 3 }">{{
-                      i
-                    }}</span>
-                  </div>
-                </td>
-                <td class="py-3">
-                  <div
-                    class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-48"
-                  ></div>
-                </td>
-                <td class="py-3">
-                  <div
-                    class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-32"
-                  ></div>
-                </td>
-                <td class="py-3">
-                  <div
-                    class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"
-                  ></div>
-                </td>
-              </tr>
-            </template>
-            <template
-              v-else-if="artistSongs.songs && artistSongs.songs.length > 0"
-            >
-              <tr
-                v-for="(song, index) in artistSongs.songs"
-                :key="song.id"
-                class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-dark-800 cursor-pointer"
-                @dblclick="playSong(index)"
-              >
-                <td class="py-3 px-2">
-                  <div class="flex items-center justify-between">
-                    <span :class="{ 'text-primary font-medium': index < 3 }">{{
-                      index + 1
-                    }}</span>
-                    <div
-                      class="i-carbon-play text-gray-400 hover:text-primary cursor-pointer"
-                      @click="playSong(index)"
-                    ></div>
-                  </div>
-                </td>
-                <td class="py-3">
-                  <div class="flex items-center">
-                    <img
-                      v-if="song.al?.picUrl"
-                      :src="song.al.picUrl + '?param=40y40'"
-                      class="w-10 h-10 rounded mr-3 flex-shrink-0"
-                      :alt="song.name"
-                    />
-                    <div>
-                      <div class="font-medium">{{ song.name }}</div>
-                      <div
-                        v-if="song.alia && song.alia.length > 0"
-                        class="text-xs text-gray-500"
-                      >
-                        {{ song.alia.join("/") }}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td class="py-3">
-                  <router-link
-                    v-if="song.al"
-                    :to="`/discover/album/${song.al.id}`"
-                    class="text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary"
-                  >
-                    {{ song.al.name }}
-                  </router-link>
-                </td>
-                <td class="py-3 text-gray-500">
-                  {{ formatDuration(song.dt) }}
-                </td>
-              </tr>
-            </template>
-            <template v-else>
-              <tr>
-                <td colspan="4" class="py-8 text-center text-gray-500">
-                  暂无歌曲
-                </td>
-              </tr>
-            </template>
-          </tbody>
-        </table>
-      </div>
+      <MusicList
+        :tracks="artistSongs.songs || []"
+        :loading="loading"
+        :show-search="false"
+        :show-count="false"
+        empty-text="暂无歌曲"
+        @play="playSongFromList"
+        @add-to-playlist="addToPlaylist"
+        @toggle-like="toggleLike"
+        @more-actions="showMoreActions"
+      />
     </div>
 
     <!-- 专辑 -->
@@ -199,66 +106,29 @@
         >
       </div>
 
-      <!-- 加载状态 -->
-      <div
-        v-if="loading"
-        class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4"
-      >
-        <div v-for="i in 5" :key="i" class="album-item">
-          <div
-            class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2 bg-gray-200 dark:bg-gray-700 animate-pulse"
-          ></div>
-          <div
-            class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"
-          ></div>
-          <div
-            class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/3"
-          ></div>
-        </div>
-      </div>
-
       <!-- 专辑列表 -->
-      <div v-else class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        <div
-          v-for="album in artistAlbums.hotAlbums"
-          :key="album.id"
-          class="album-item cursor-pointer"
-          @click="navigateToAlbum(album.id)"
-        >
-          <div
-            class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2"
-          >
-            <img
-              :src="album.picUrl + '?param=200y200'"
-              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-              :alt="album.name"
-            />
+      <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <template v-if="loading">
+          <div v-for="i in 5" :key="i" class="album-item">
             <div
-              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2"
-            >
-              <div class="flex items-center justify-between">
-                <button
-                  class="flex items-center text-white text-xs hover:text-primary-light transition-colors"
-                  @click.stop="playAlbum(album.id)"
-                >
-                  <div class="i-carbon-play-filled mr-1"></div>
-                  <span>播放</span>
-                </button>
-                <button
-                  class="flex items-center text-white text-xs hover:text-primary-light transition-colors"
-                  @click.stop="addAlbumToPlaylist(album.id)"
-                >
-                  <div class="i-carbon-add mr-1"></div>
-                  <span>添加</span>
-                </button>
-              </div>
-            </div>
+              class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2 bg-gray-200 dark:bg-gray-700 animate-pulse"
+            ></div>
+            <div
+              class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"
+            ></div>
+            <div
+              class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/3"
+            ></div>
           </div>
-          <div class="text-sm font-medium truncate">{{ album.name }}</div>
-          <div class="text-xs text-gray-500">
-            {{ formatDate(album.publishTime) }}
-          </div>
-        </div>
+        </template>
+        <template v-else>
+          <AlbumCard
+            v-for="album in artistAlbums.hotAlbums"
+            :key="album.id"
+            :album="album"
+            @play="playAlbum"
+          />
+        </template>
       </div>
     </div>
 
@@ -268,43 +138,30 @@
         <h2 class="text-xl font-bold">相似歌手</h2>
       </div>
 
-      <!-- 加载状态 -->
-      <div
-        v-if="loading"
-        class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4"
-      >
-        <div v-for="i in 6" :key="i" class="text-center">
-          <div
-            class="w-24 h-24 mx-auto bg-gray-200 dark:bg-gray-700 rounded-full mb-2 animate-pulse"
-          ></div>
-          <div
-            class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20 mx-auto"
-          ></div>
-        </div>
-      </div>
-
       <!-- 歌手列表 -->
-      <div
-        v-else
-        class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
-      >
-        <router-link
-          v-for="artist in similarArtists.artists"
-          :key="artist.id"
-          :to="`/discover/artist/${artist.id}`"
-          class="text-center hover:opacity-90 transition-opacity group"
-        >
-          <div
-            class="relative overflow-hidden rounded-full mb-2 mx-auto w-24 h-24"
-          >
-            <img
-              :src="artist.picUrl + '?param=120y120'"
-              class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              :alt="artist.name"
-            />
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <template v-if="loading">
+          <div v-for="i in 6" :key="i" class="text-center">
+            <div
+              class="w-24 h-24 mx-auto bg-gray-200 dark:bg-gray-700 rounded-full mb-2 animate-pulse"
+            ></div>
+            <div
+              class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20 mx-auto"
+            ></div>
           </div>
-          <div class="text-sm font-medium truncate">{{ artist.name }}</div>
-        </router-link>
+        </template>
+        <template v-else>
+          <ArtistCard
+            v-for="artist in similarArtists.artists"
+            :key="artist.id"
+            :artist="artist"
+            :show-tags="false"
+            :show-follow-button="true"
+            @play="playArtistHotSongs"
+            @follow="followArtist"
+            @unfollow="unfollowArtist"
+          />
+        </template>
       </div>
     </div>
   </div>
@@ -322,6 +179,9 @@ import {
 } from "@/api/artist";
 import { getAlbumDetail } from "@/api/album";
 import { ElMessage } from "element-plus";
+import MusicList from '@/components/common/MusicList.vue';
+import AlbumCard from '@/components/common/AlbumCard.vue';
+import ArtistCard from '@/components/common/ArtistCard.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -385,27 +245,6 @@ async function playAlbum(id: number) {
   }
 }
 
-// 添加专辑到播放列表
-async function addAlbumToPlaylist(id: number) {
-  try {
-    const albumDetail = await getAlbumDetail(id);
-    if (albumDetail && albumDetail.songs && albumDetail.songs.length > 0) {
-      // 将专辑中的所有歌曲添加到播放列表，但不立即播放
-      albumDetail.songs.forEach(song => {
-        playerStore.addToPlaylist(song);
-      });
-      // 显示提示信息
-      ElMessage({
-        message: `已将专辑《${albumDetail.album.name}》添加到播放列表`,
-        type: 'success',
-      });
-    }
-  } catch (error) {
-    console.error('添加专辑到播放列表失败:', error);
-    ElMessage.error('添加到播放列表失败');
-  }
-}
-
 // 获取歌手详情数据
 async function fetchArtistData(id: number) {
   try {
@@ -451,4 +290,86 @@ onMounted(() => {
     fetchArtistData(Number(artistId));
   }
 });
+
+/**
+ * 从列表中播放歌曲
+ * @param data 包含歌曲和索引的对象
+ */
+function playSongFromList(data: { track: any, index: number }) {
+  if (artistSongs.value.songs && artistSongs.value.songs.length > 0) {
+    playerStore.setPlaylist(artistSongs.value.songs);
+    playerStore.play(data.index);
+  }
+}
+
+/**
+ * 添加歌曲到播放列表
+ * @param track 歌曲对象
+ */
+function addToPlaylist(track: any) {
+  // 检查歌曲是否已在播放列表中
+  const existingIndex = playerStore.playlist.findIndex((item: any) => item.id === track.id);
+
+  if (existingIndex === -1) {
+    // 添加到播放列表
+    const newPlaylist = [...playerStore.playlist, track];
+    playerStore.setPlaylist(newPlaylist);
+    ElMessage.success('已添加到播放列表');
+  } else {
+    ElMessage.info('歌曲已在播放列表中');
+  }
+}
+
+/**
+ * 切换歌曲喜欢状态
+ * @param track 歌曲对象
+ */
+function toggleLike(track: any) {
+  // 这里应该调用API来喜欢/取消喜欢歌曲
+  // 由于API未实现，这里只做提示
+  ElMessage.success(`${track.name} 已添加到我喜欢的音乐`);
+}
+
+/**
+ * 显示更多操作
+ * @param track 歌曲对象
+ */
+function showMoreActions(track: any) {
+  // 这里可以显示一个操作菜单，如下载、分享等
+  ElMessage.info('更多操作功能开发中');
+}
+
+/**
+ * 播放艺术家热门歌曲
+ * @param artistId 艺术家ID
+ */
+function playArtistHotSongs(artistId: number) {
+  // 获取艺术家热门歌曲并播放
+  getArtistSongs(artistId).then(res => {
+    if (res.songs && res.songs.length > 0) {
+      playerStore.setPlaylist(res.songs);
+      playerStore.play(0);
+    }
+  });
+}
+
+/**
+ * 关注艺术家
+ * @param artistId 艺术家ID
+ */
+function followArtist(artistId: number) {
+  // 这里应该调用API来关注艺术家
+  // 由于API未实现，这里只做提示
+  ElMessage.success('关注成功');
+}
+
+/**
+ * 取消关注艺术家
+ * @param artistId 艺术家ID
+ */
+function unfollowArtist(artistId: number) {
+  // 这里应该调用API来取消关注艺术家
+  // 由于API未实现，这里只做提示
+  ElMessage.success('已取消关注');
+}
 </script>

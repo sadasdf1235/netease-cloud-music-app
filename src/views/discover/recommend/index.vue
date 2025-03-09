@@ -70,31 +70,17 @@
 
       <!-- 歌单列表 -->
       <div v-else class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        <div
+        <RecommendCard
           v-for="playlist in recommendPlaylists"
           :key="playlist.id"
-          class="playlist-item cursor-pointer"
+          :id="playlist.id"
+          :cover-url="playlist.picUrl + '?param=200y200'"
+          :title="playlist.name"
+          :count="playlist.playCount"
+          type="playlist"
           @click="navigateToPlaylist(playlist.id)"
-        >
-          <div
-            class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2"
-          >
-            <img
-              :src="playlist.picUrl + '?param=200y200'"
-              class="w-full h-full object-cover"
-              :alt="playlist.name"
-            />
-            <div
-              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2"
-            >
-              <div class="flex items-center text-white text-xs">
-                <div class="i-carbon-play-filled mr-1"></div>
-                <span>{{ formatPlayCount(playlist.playCount) }}</span>
-              </div>
-            </div>
-          </div>
-          <div class="text-sm line-clamp-2 h-10">{{ playlist.name }}</div>
-        </div>
+          @play="playPlaylist(playlist.id)"
+        />
       </div>
     </div>
 
@@ -167,64 +153,28 @@
         <!-- 新歌推荐 -->
         <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
           <h3 class="text-lg font-medium mb-3">新歌推荐</h3>
-          <div class="space-y-2">
-            <div
-              v-for="song in newSongs.slice(0, 5)"
-              :key="song.id"
-              class="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-dark-800 rounded-md transition-colors cursor-pointer"
-              @click="playSong(song)"
-            >
-              <img
-                :src="song.album.picUrl + '?param=60y60'"
-                class="w-10 h-10 rounded mr-3 flex-shrink-0"
-                :alt="song.name"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium truncate">{{ song.name }}</div>
-                <div class="text-xs text-gray-500 truncate">
-                  {{ song.artists.map((a) => a.name).join("/") }}
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button class="icon-btn" @click.stop="playAlbum(song.album.id)">
-                  <div
-                    class="i-carbon-play-filled text-gray-500 hover:text-primary"
-                  ></div>
-                </button>
-              </div>
-            </div>
-          </div>
+          <MusicList
+            :tracks="newSongs.slice(0, 5)"
+            :loading="newSongsLoading"
+            :show-search="false"
+            :show-count="false"
+            empty-text="暂无新歌推荐"
+            @play="playSongFromList"
+            @add-to-playlist="addToPlaylist"
+            @toggle-like="toggleLike"
+          />
         </div>
 
         <!-- 新碟上架 -->
         <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
           <h3 class="text-lg font-medium mb-3">新碟上架</h3>
-          <div class="space-y-2">
-            <div
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <AlbumCard
               v-for="album in newAlbums.slice(0, 5)"
               :key="album.id"
-              class="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-dark-800 rounded-md transition-colors cursor-pointer"
-              @click="navigateToAlbum(album.id)"
-            >
-              <img
-                :src="album.picUrl + '?param=60y60'"
-                class="w-10 h-10 rounded mr-3 flex-shrink-0"
-                :alt="album.name"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium truncate">{{ album.name }}</div>
-                <div class="text-xs text-gray-500 truncate">
-                  {{ album.artist.name }}
-                </div>
-              </div>
-              <div class="flex items-center gap-2">
-                <button class="icon-btn" @click.stop="playAlbum(album.id)">
-                  <div
-                    class="i-carbon-play-filled text-gray-500 hover:text-primary"
-                  ></div>
-                </button>
-              </div>
-            </div>
+              :album="album"
+              @play="playAlbum"
+            />
           </div>
         </div>
       </div>
@@ -258,19 +208,15 @@
 
       <!-- 歌手列表 -->
       <div v-else class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <router-link
-          v-for="artist in hotArtists"
+        <ArtistCard
+          v-for="artist in hotArtists.slice(0, 6)"
           :key="artist.id"
-          :to="`/discover/artist/${artist.id}`"
-          class="text-center hover:opacity-90 transition-opacity"
-        >
-          <img
-            :src="artist.picUrl + '?param=120y120'"
-            class="w-24 h-24 mx-auto rounded-full mb-2 object-cover"
-            :alt="artist.name"
-          />
-          <div class="text-sm font-medium">{{ artist.name }}</div>
-        </router-link>
+          :artist="artist"
+          :show-tags="false"
+          @play="playArtistHotSongs"
+          @follow="followArtist"
+          @unfollow="unfollowArtist"
+        />
       </div>
     </div>
   </div>
@@ -280,37 +226,52 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { usePlayerStore } from "@/stores/player";
+import { useMessage } from "naive-ui";
 import {
   getBanners,
   getRecommendPlaylists,
   getNewSongs,
   getNewAlbums,
   getHotArtists,
+  getPlaylistDetail,
+  getPlaylistTracks,
+  getArtistHotSongs
 } from "@/api/music";
-import { getAlbumDetail } from "@/api/album";
+import type {
+  Banner,
+  RecommendPlaylistItem,
+  RecommendSong,
+  RecommendAlbum,
+  RecommendArtist
+} from "@/types/models/recommend";
+import RecommendCard from '@/components/common/RecommendCard.vue';
+import MusicList from '@/components/common/MusicList.vue';
+import AlbumCard from '@/components/common/AlbumCard.vue';
+import ArtistCard from '@/components/common/ArtistCard.vue';
 
 const router = useRouter();
 const playerStore = usePlayerStore();
+const message = useMessage();
 
 // 轮播图数据
+const banners = ref<Banner[]>([]);
 const bannersLoading = ref(true);
-const banners = ref([]);
 
 // 推荐歌单数据
+const recommendPlaylists = ref<RecommendPlaylistItem[]>([]);
 const playlistsLoading = ref(true);
-const recommendPlaylists = ref([]);
 
 // 新歌数据
+const newSongs = ref<RecommendSong[]>([]);
 const newSongsLoading = ref(true);
-const newSongs = ref([]);
 
 // 新碟数据
+const newAlbums = ref<RecommendAlbum[]>([]);
 const newAlbumsLoading = ref(true);
-const newAlbums = ref([]);
 
 // 热门歌手数据
+const hotArtists = ref<RecommendArtist[]>([]);
 const artistsLoading = ref(true);
-const hotArtists = ref([]);
 
 // 格式化播放次数
 function formatPlayCount(count: number) {
@@ -493,4 +454,97 @@ onMounted(async () => {
     }
   }, 1000);
 });
+
+/**
+ * 播放歌单
+ * @param id 歌单ID
+ */
+function playPlaylist(id: number) {
+  // 获取歌单详情并播放
+  getPlaylistDetail(id).then((res: any) => {
+    if (res.playlist && res.playlist.trackIds) {
+      // 获取歌单中的歌曲
+      getPlaylistTracks(id, res.playlist.trackIds.map((t: any) => t.id)).then((tracksRes: any) => {
+        if (tracksRes.songs && tracksRes.songs.length > 0) {
+          // 设置播放列表并播放第一首
+          playerStore.setPlaylist(tracksRes.songs);
+          playerStore.play(0);
+        }
+      });
+    }
+  });
+}
+
+/**
+ * 从列表中播放歌曲
+ * @param data 包含歌曲和索引的对象
+ */
+function playSongFromList(data: { track: any, index: number }) {
+  // 设置播放列表为当前显示的新歌列表
+  playerStore.setPlaylist(newSongs.value);
+  // 播放选中的歌曲
+  playerStore.play(data.index);
+}
+
+/**
+ * 添加歌曲到播放列表
+ * @param track 歌曲对象
+ */
+function addToPlaylist(track: any) {
+  // 检查歌曲是否已在播放列表中
+  const existingIndex = playerStore.playlist.findIndex((item: any) => item.id === track.id);
+
+  if (existingIndex === -1) {
+    // 添加到播放列表
+    const newPlaylist = [...playerStore.playlist, track];
+    playerStore.setPlaylist(newPlaylist);
+    message.success('已添加到播放列表');
+  } else {
+    message.info('歌曲已在播放列表中');
+  }
+}
+
+/**
+ * 切换歌曲喜欢状态
+ * @param track 歌曲对象
+ */
+function toggleLike(track: any) {
+  // 这里应该调用API来喜欢/取消喜欢歌曲
+  // 由于API未实现，这里只做提示
+  message.success(`${track.name} 已添加到我喜欢的音乐`);
+}
+
+/**
+ * 播放艺术家热门歌曲
+ * @param artistId 艺术家ID
+ */
+function playArtistHotSongs(artistId: number) {
+  // 获取艺术家热门歌曲并播放
+  getArtistHotSongs(artistId).then(res => {
+    if (res.songs && res.songs.length > 0) {
+      playerStore.setPlaylist(res.songs);
+      playerStore.play(0);
+    }
+  });
+}
+
+/**
+ * 关注艺术家
+ * @param artistId 艺术家ID
+ */
+function followArtist(artistId: number) {
+  // 这里应该调用API来关注艺术家
+  // 由于API未实现，这里只做提示
+  message.success('关注成功');
+}
+
+/**
+ * 取消关注艺术家
+ * @param artistId 艺术家ID
+ */
+function unfollowArtist(artistId: number) {
+  // 这里应该调用API来取消关注艺术家
+  // 由于API未实现，这里只做提示
+  message.success('已取消关注');
+}
 </script>

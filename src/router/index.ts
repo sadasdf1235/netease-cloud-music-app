@@ -60,6 +60,45 @@ const routes: RouteRecordRaw[] = [
         component: () => import("@/views/discover/album/index.vue"),
         meta: { title: "专辑" },
       },
+      {
+        path: "album/:id",
+        name: "album-detail",
+        component: () => import("@/views/discover/album/detail.vue"),
+        meta: { title: "专辑详情" },
+      },
+    ],
+  },
+  // 搜索页面路由
+  {
+    path: "/search",
+    name: "search",
+    component: () => import("@/views/search/index.vue"),
+    meta: { title: "搜索" },
+    children: [
+      {
+        path: "songs",
+        name: "search-songs",
+        component: () => import("@/views/search/SearchCategoryResults.vue"),
+        meta: { title: "搜索歌曲", type: "songs" },
+      },
+      {
+        path: "albums",
+        name: "search-albums",
+        component: () => import("@/views/search/SearchCategoryResults.vue"),
+        meta: { title: "搜索专辑", type: "albums" },
+      },
+      {
+        path: "artists",
+        name: "search-artists",
+        component: () => import("@/views/search/SearchCategoryResults.vue"),
+        meta: { title: "搜索歌手", type: "artists" },
+      },
+      {
+        path: "playlists",
+        name: "search-playlists",
+        component: () => import("@/views/search/SearchCategoryResults.vue"),
+        meta: { title: "搜索歌单", type: "playlists" },
+      },
     ],
   },
   // 添加测试页面路由
@@ -72,22 +111,10 @@ const routes: RouteRecordRaw[] = [
   // 以下路由暂时注释，等待实现对应组件
   /*
   {
-    path: '/playlist/detail/:id',
-    name: 'playlistDetail',
-    component: () => import('@/views/playlist/detail.vue'),
-    meta: { title: '歌单详情' }
-  },
-  {
     path: '/song/:id',
     name: 'songDetail',
     component: () => import('@/views/song/detail.vue'),
     meta: { title: '歌曲详情' }
-  },
-  {
-    path: '/search',
-    name: 'search',
-    component: () => import('@/views/search/index.vue'),
-    meta: { title: '搜索' }
   },
   {
     path: '/my',
