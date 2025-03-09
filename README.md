@@ -99,7 +99,17 @@ pnpm build
 ```
 ├── src/                     # 源代码目录
 │   ├── api/                # API 接口定义
-│   │   ├── modules/        # 按功能模块划分的API
+│   │   ├── modules/        # 按功能模块划分的API（主要API目录）
+│   │   │   ├── album.ts    # 专辑相关API
+│   │   │   ├── artist.ts   # 艺术家相关API 
+│   │   │   ├── comment.ts  # 评论相关API
+│   │   │   ├── mv.ts       # MV相关API
+│   │   │   ├── playlist.ts # 歌单相关API
+│   │   │   ├── search.ts   # 搜索相关API
+│   │   │   ├── song.ts     # 歌曲相关API
+│   │   │   └── user.ts     # 用户相关API
+│   │   ├── music.ts        # 音乐相关API
+│   │   ├── toplist.ts      # 排行榜相关API
 │   │   ├── index.ts        # API统一导出
 │   │   └── request.ts      # 请求封装
 │   ├── assets/             # 静态资源
@@ -188,3 +198,25 @@ pnpm build
 ## 许可证
 
 [MIT License](LICENSE)
+
+## 代码整理记录
+
+### API模块整理
+
+- 移除了重复的API文件，将API模块集中在`src/api/modules`目录下管理
+- 保留了`src/api/music.ts`和`src/api/toplist.ts`，因其被多个组件直接引用
+- 优化了API导出结构，确保所有API调用一致性
+- 删除了未使用的`src/api/recommend.ts`文件
+
+### 请求工具统一
+
+- 移除了`src/api/request.ts`，统一使用`src/utils/request.ts`作为HTTP请求工具
+- 统一了所有API模块的导入路径，使用`@/utils/request`替代相对路径导入
+- 添加`withSimpleCache`函数，统一API缓存调用方式
+- 修改了所有使用缓存的API函数，确保接口一致
+
+### 优化方向
+
+- 将来可考虑进一步统一`music.ts`和`toplist.ts`到modules目录
+- 完善API响应类型定义，减少any类型的使用
+- 增加请求错误处理和重试机制

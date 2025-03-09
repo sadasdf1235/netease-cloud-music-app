@@ -204,4 +204,27 @@ export function withCache<T>(
   };
 }
 
+/**
+ * 简化版的缓存包装函数，用于直接包装API调用
+ * 与原withCache函数不同，这个函数采用更简单的调用方式
+ * @param apiCall API调用函数
+ * @param cacheKey 缓存键
+ * @param ttl 缓存时间（毫秒）
+ * @returns Promise<T> 包含缓存的Promise
+ */
+export function withSimpleCache<T>(
+  apiCall: () => Promise<T>,
+  cacheKey: string,
+  ttl: number
+): Promise<T> {
+  const cachedData = getCacheData<T>(cacheKey);
+  if (cachedData) {
+    return Promise.resolve(cachedData);
+  }
+  return apiCall().then(data => {
+    setCacheData(cacheKey, data, ttl);
+    return data;
+  });
+}
+
 export default apiCache;

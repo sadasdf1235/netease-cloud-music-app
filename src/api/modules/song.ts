@@ -1,9 +1,9 @@
- /**
+/**
  * 歌曲相关API
  * @description 包含歌曲URL、详情、歌词等接口
  */
-import { get } from '../request';
-import { withCache } from '@/utils/apiCache';
+import { get } from '@/utils/request';
+import { withSimpleCache } from '@/utils/apiCache';
 import type { SongUrlResponse } from '@/types/api/music';
 
 /**
@@ -29,7 +29,7 @@ export function getSongDetail(ids: number | number[], useCache = true) {
   const idsStr = Array.isArray(ids) ? ids.join(',') : ids;
   const apiCall = () => get('/song/detail', { ids: idsStr });
   return useCache
-    ? withCache(apiCall, `song_detail_${idsStr}`, 24 * 60 * 60 * 1000) // 缓存24小时
+    ? withSimpleCache(apiCall, `song_detail_${idsStr}`, 24 * 60 * 60 * 1000) // 缓存24小时
     : apiCall();
 }
 
@@ -42,7 +42,7 @@ export function getSongDetail(ids: number | number[], useCache = true) {
 export function getLyric(id: number, useCache = true) {
   const apiCall = () => get('/lyric', { id });
   return useCache
-    ? withCache(apiCall, `lyric_${id}`, 7 * 24 * 60 * 60 * 1000) // 缓存7天
+    ? withSimpleCache(apiCall, `lyric_${id}`, 7 * 24 * 60 * 60 * 1000) // 缓存7天
     : apiCall();
 }
 
@@ -55,7 +55,7 @@ export function getLyric(id: number, useCache = true) {
 export function getSimiSongs(id: number, useCache = true) {
   const apiCall = () => get('/simi/song', { id });
   return useCache
-    ? withCache(apiCall, `simi_songs_${id}`, 24 * 60 * 60 * 1000) // 缓存24小时
+    ? withSimpleCache(apiCall, `simi_songs_${id}`, 24 * 60 * 60 * 1000) // 缓存24小时
     : apiCall();
 }
 

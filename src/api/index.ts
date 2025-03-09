@@ -4,9 +4,9 @@
  */
 
 // 导出请求工具
-export { default as request, get, post } from './request';
+export { default as request, get, post } from '@/utils/request';
 
-// 导出API模块
+// 导出模块化API
 import * as albumApi from './modules/album';
 import * as artistApi from './modules/artist';
 import * as commentApi from './modules/comment';
@@ -14,15 +14,29 @@ import * as playlistApi from './modules/playlist';
 import * as searchApi from './modules/search';
 import * as songApi from './modules/song';
 import * as userApi from './modules/user';
+import * as mvApi from './modules/mv';
+
+// 导出直接API
+import * as musicApi from './music';
+import * as toplistApi from './toplist';
+
+// 导入工具函数用于内部函数
+import { get } from '@/utils/request';
 
 export {
+  // 模块化API
   albumApi,
   artistApi,
   commentApi,
   playlistApi,
   searchApi,
   songApi,
-  userApi
+  userApi,
+  mvApi,
+  
+  // 直接API
+  musicApi,
+  toplistApi
 };
 
 /**

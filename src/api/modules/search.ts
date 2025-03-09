@@ -2,8 +2,8 @@
  * 搜索相关API
  * @description 包含搜索功能的各种接口
  */
-import { get } from '../request';
-import { withCache } from '@/utils/apiCache';
+import { get } from '@/utils/request';
+import { withSimpleCache } from '@/utils/apiCache';
 import { SearchType } from '@/types/api/search';
 import type { SearchParams } from '@/types/api/search';
 
@@ -18,7 +18,7 @@ export function search(params: SearchParams, useCache = true) {
   const apiCall = () => get('/search', { keywords, type, limit, offset });
 
   return useCache
-    ? withCache(
+    ? withSimpleCache(
         apiCall,
         `search_${keywords}_${type}_${limit}_${offset}`,
         10 * 60 * 1000 // 缓存10分钟
@@ -35,7 +35,7 @@ export function getSearchHot(useCache = true) {
   const apiCall = () => get('/search/hot');
 
   return useCache
-    ? withCache(apiCall, 'search_hot', 30 * 60 * 1000) // 缓存30分钟
+    ? withSimpleCache(apiCall, 'search_hot', 30 * 60 * 1000) // 缓存30分钟
     : apiCall();
 }
 
@@ -48,7 +48,7 @@ export function getSearchHotDetail(useCache = true) {
   const apiCall = () => get('/search/hot/detail');
 
   return useCache
-    ? withCache(apiCall, 'search_hot_detail', 30 * 60 * 1000) // 缓存30分钟
+    ? withSimpleCache(apiCall, 'search_hot_detail', 30 * 60 * 1000) // 缓存30分钟
     : apiCall();
 }
 

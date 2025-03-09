@@ -1,9 +1,9 @@
- /**
+/**
  * 用户相关API
  * @description 包含登录、用户信息、关注等接口
  */
-import { get, post } from '../request';
-import { withCache } from '@/utils/apiCache';
+import { get, post } from '@/utils/request';
+import { withSimpleCache } from '@/utils/apiCache';
 
 /**
  * 手机号登录
@@ -51,7 +51,7 @@ export function getLoginStatus() {
 export function getUserDetail(uid: number, useCache = true) {
   const apiCall = () => get('/user/detail', { uid });
   return useCache
-    ? withCache(apiCall, `user_detail_${uid}`, 60 * 60 * 1000) // 缓存1小时
+    ? withSimpleCache(apiCall, `user_detail_${uid}`, 60 * 60 * 1000) // 缓存1小时
     : apiCall();
 }
 
