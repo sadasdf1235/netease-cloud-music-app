@@ -1,262 +1,247 @@
 <template>
   <div class="playlist-page">
     <!-- 歌单分类 -->
-    <div class="mb-6">
+    <div class="mb-6 bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-xl font-bold">全部歌单</h2>
-        <button 
-          class="px-4 py-1.5 rounded-full border border-gray-300 dark:border-gray-700 flex items-center gap-1"
-          @click="showCategoryModal = true"
-        >
-          <span>{{ currentCategory }}</span>
-          <div class="i-carbon-chevron-down"></div>
-        </button>
-      </div>
-      <div class="flex flex-wrap gap-2">
-        <button 
-          class="px-3 py-1 text-sm rounded-full" 
-          :class="currentCategory === '全部' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-dark-800 hover:bg-gray-200 dark:hover:bg-dark-700'"
-          @click="changeCategory('全部')"
-        >全部</button>
-        <button 
-          v-for="tag in hotCategories" 
-          :key="tag.name" 
-          class="px-3 py-1 text-sm rounded-full" 
-          :class="currentCategory === tag.name ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-dark-800 hover:bg-gray-200 dark:hover:bg-dark-700'"
-          @click="changeCategory(tag.name)"
-        >
-          {{ tag.name }}
-        </button>
-      </div>
-    </div>
-
-    <!-- 加载状态 -->
-    <div v-if="loading" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-      <div v-for="i in 20" :key="i" class="playlist-item">
-        <div class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2 bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-2/3"></div>
+        <div class="flex items-center space-x-4">
+          <n-dropdown
+            trigger="click"
+            :options="categoryOptions"
+            @select="handleCategorySelect"
+          >
+            <n-button>
+              {{ currentCategory }}
+              <div class="i-carbon-chevron-down ml-1"></div>
+            </n-button>
+          </n-dropdown>
+          <div class="text-sm text-gray-500">
+            <span>热门标签：</span>
+            <n-space>
+              <n-tag
+                v-for="tag in hotTags"
+                :key="tag"
+                :bordered="false"
+                round
+                size="small"
+                class="cursor-pointer hover:text-primary"
+                @click="handleTagClick(tag)"
+              >
+                {{ tag }}
+              </n-tag>
+            </n-space>
+          </div>
+        </div>
+        <n-switch v-model:value="showHighQuality" size="small">
+          <template #checked>精品歌单</template>
+          <template #unchecked>全部歌单</template>
+        </n-switch>
       </div>
     </div>
 
     <!-- 歌单列表 -->
-    <div v-else class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-      <div 
-        v-for="playlist in playlists" 
-        :key="playlist.id" 
-        class="playlist-item cursor-pointer"
-        @click="navigateToPlaylist(playlist.id)"
-      >
-        <div class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2">
-          <img :src="playlist.coverImgUrl + '?param=200y200'" class="w-full h-full object-cover" :alt="playlist.name" />
-          <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2">
-            <div class="flex items-center text-white text-xs">
-              <div class="i-carbon-play-filled mr-1"></div>
-              <span>{{ formatPlayCount(playlist.playCount) }}</span>
-            </div>
-          </div>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      <!-- 加载状态 -->
+      <template v-if="loading">
+        <div
+          v-for="i in 20"
+          :key="i"
+          class="playlist-item animate-pulse"
+        >
+          <div class="relative rounded-lg overflow-hidden aspect-square shadow-md mb-2 bg-gray-200 dark:bg-gray-700"></div>
+          <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+          <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
         </div>
-        <div class="text-sm line-clamp-2 h-10">{{ playlist.name }}</div>
-        <div class="text-xs text-gray-500">by {{ playlist.creator.nickname }}</div>
-      </div>
+      </template>
+
+      <!-- 歌单卡片 -->
+      <template v-else>
+        <PlaylistCard
+          v-for="playlist in playlists"
+          :key="playlist.id"
+          :playlist="playlist"
+          @click="navigateToDetail(playlist.id)"
+          @play="playPlaylist(playlist.id)"
+        />
+      </template>
     </div>
 
     <!-- 分页 -->
-    <div class="flex justify-center mt-8">
-      <div class="flex items-center gap-2">
-        <button 
-          class="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center"
-          :disabled="currentPage <= 1"
-          @click="changePage(currentPage - 1)"
-        >
-          <div class="i-carbon-chevron-left"></div>
-        </button>
-        <button 
-          v-for="page in displayPages" 
-          :key="page" 
-          class="w-8 h-8 rounded-full flex items-center justify-center"
-          :class="currentPage === page ? 'bg-primary text-white' : 'border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-dark-800'"
-          @click="changePage(page)"
-        >
-          {{ page }}
-        </button>
-        <button 
-          class="w-8 h-8 rounded-full border border-gray-300 dark:border-gray-700 flex items-center justify-center"
-          :disabled="currentPage >= totalPages"
-          @click="changePage(currentPage + 1)"
-        >
-          <div class="i-carbon-chevron-right"></div>
-        </button>
-      </div>
+    <div class="mt-6 flex justify-center">
+      <n-pagination
+        v-model:page="currentPage"
+        v-model:page-size="pageSize"
+        :item-count="total"
+        :page-sizes="[30, 60, 90]"
+        show-size-picker
+        @update:page="handlePageChange"
+        @update:page-size="handlePageSizeChange"
+      />
     </div>
-
-    <!-- 分类选择弹窗 (简化版) -->
-    <n-modal v-model:show="showCategoryModal" preset="card" title="选择分类" style="width: 600px;">
-      <div class="max-h-96 overflow-y-auto">
-        <div class="mb-4">
-          <h3 class="font-medium mb-2">热门分类</h3>
-          <div class="flex flex-wrap gap-2">
-            <button 
-              v-for="tag in hotCategories" 
-              :key="tag.name"
-              class="px-3 py-1 text-sm rounded-full bg-gray-100 dark:bg-dark-800 hover:bg-gray-200 dark:hover:bg-dark-700"
-              @click="changeCategory(tag.name); showCategoryModal = false"
-            >
-              {{ tag.name }}
-            </button>
-          </div>
-        </div>
-        <div v-for="(cats, type) in categories" :key="type" class="mb-4">
-          <h3 class="font-medium mb-2">{{ type }}</h3>
-          <div class="flex flex-wrap gap-2">
-            <button 
-              v-for="cat in cats" 
-              :key="cat"
-              class="px-3 py-1 text-sm rounded-full bg-gray-100 dark:bg-dark-800 hover:bg-gray-200 dark:hover:bg-dark-700"
-              @click="changeCategory(cat); showCategoryModal = false"
-            >
-              {{ cat }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </n-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { getPlaylistCategories } from '@/api/playlist'
-import { getTopPlaylistsByCategory } from '@/api/music'
+import { ref, onMounted, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { useMessage } from 'naive-ui';
+import { usePlayerStore } from '@/stores/player';
+import {
+  getPlaylistCategories,
+  getHotPlaylistCategories,
+  getPlaylistsByCategory,
+  getHighqualityPlaylists,
+  getPlaylistDetail,
+  getPlaylistTracks
+} from '@/api/playlist';
+import type { PlaylistCategory, Playlist } from '@/types/playlist';
+import PlaylistCard from '@/components/playlist/PlaylistCard.vue';
 
-const router = useRouter()
+const router = useRouter();
+const message = useMessage();
+const playerStore = usePlayerStore();
 
-// 加载状态
-const loading = ref(true)
+// 分类相关
+const currentCategory = ref('全部');
+const categoryOptions = ref<any[]>([]);
+const hotTags = ref<string[]>([]);
 
-// 分类数据
-const categories = ref({})
-const hotCategories = ref([])
-const currentCategory = ref('全部')
-const showCategoryModal = ref(false)
+// 列表相关
+const loading = ref(true);
+const playlists = ref<Playlist[]>([]);
+const showHighQuality = ref(false);
+const currentPage = ref(1);
+const pageSize = ref(30);
+const total = ref(0);
 
-// 歌单数据
-const playlists = ref([])
-const currentPage = ref(1)
-const pageSize = 30
-const total = ref(0)
-
-// 计算总页数
-const totalPages = computed(() => Math.ceil(total.value / pageSize))
-
-// 计算要显示的页码
-const displayPages = computed(() => {
-  const pages = []
-  const maxDisplayPages = 5
-  
-  if (totalPages.value <= maxDisplayPages) {
-    // 如果总页数小于等于最大显示页数，则显示所有页码
-    for (let i = 1; i <= totalPages.value; i++) {
-      pages.push(i)
-    }
-  } else {
-    // 否则，显示当前页附近的页码
-    let startPage = Math.max(1, currentPage.value - Math.floor(maxDisplayPages / 2))
-    let endPage = Math.min(totalPages.value, startPage + maxDisplayPages - 1)
-    
-    // 调整起始页，确保显示的页码数量为 maxDisplayPages
-    if (endPage - startPage + 1 < maxDisplayPages) {
-      startPage = Math.max(1, endPage - maxDisplayPages + 1)
-    }
-    
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i)
-    }
-  }
-  
-  return pages
-})
-
-// 格式化播放次数
-function formatPlayCount(count) {
-  if (count > 100000000) {
-    return Math.floor(count / 100000000) + '亿'
-  } else if (count > 10000) {
-    return Math.floor(count / 10000) + '万'
-  }
-  return count
-}
-
-// 跳转到歌单详情
-function navigateToPlaylist(id) {
-  router.push(`/discover/playlist/${id}`)
-}
-
-// 获取歌单分类
+// 获取分类列表
 async function fetchCategories() {
   try {
-    const res = await getPlaylistCategories()
-    if (res && res.categories && res.sub) {
-      // 处理分类数据
-      const categoriesData = {}
-      Object.keys(res.categories).forEach(key => {
-        categoriesData[res.categories[key]] = []
-      })
-      
-      res.sub.forEach(item => {
-        const category = res.categories[item.category]
-        if (categoriesData[category]) {
-          categoriesData[category].push(item.name)
-        }
-      })
-      
-      categories.value = categoriesData
-      
-      // 热门分类
-      hotCategories.value = res.sub.filter(item => item.hot).slice(0, 8)
-    }
+    const [categoriesRes, hotTagsRes] = await Promise.all([
+      getPlaylistCategories(),
+      getHotPlaylistCategories()
+    ]);
+
+    // 处理分类选项
+    const categories = categoriesRes.categories;
+    const subs = categoriesRes.sub;
+    categoryOptions.value = Object.entries(categories).map(([id, name]) => ({
+      label: name,
+      key: id,
+      children: subs
+        .filter(item => item.category === Number(id))
+        .map(item => ({
+          label: item.name,
+          key: item.name
+        }))
+    }));
+
+    // 处理热门标签
+    hotTags.value = hotTagsRes.tags.slice(0, 5).map(tag => tag.name);
   } catch (error) {
-    console.error('获取歌单分类失败:', error)
+    console.error('获取分类失败:', error);
+    message.error('获取分类失败');
   }
 }
 
 // 获取歌单列表
 async function fetchPlaylists() {
   try {
-    loading.value = true
-    const offset = (currentPage.value - 1) * pageSize
-    const res = await getTopPlaylistsByCategory(currentCategory.value, pageSize, offset)
-    
-    if (res && res.playlists) {
-      playlists.value = res.playlists
-      total.value = res.total || 0
+    loading.value = true;
+
+    const params = {
+      cat: currentCategory.value === '全部' ? undefined : currentCategory.value,
+      limit: pageSize.value,
+      offset: (currentPage.value - 1) * pageSize.value,
+      order: 'hot'
+    };
+
+    let res;
+    if (showHighQuality.value) {
+      res = await getHighqualityPlaylists(params);
+      playlists.value = res.playlists;
+      total.value = res.total;
+    } else {
+      res = await getPlaylistsByCategory(params);
+      playlists.value = res.playlists;
+      total.value = res.total;
     }
-    
-    loading.value = false
   } catch (error) {
-    console.error('获取歌单列表失败:', error)
-    loading.value = false
+    console.error('获取歌单列表失败:', error);
+    message.error('获取歌单列表失败');
+  } finally {
+    loading.value = false;
   }
 }
 
-// 切换分类
-function changeCategory(category) {
-  if (currentCategory.value === category) return
-  currentCategory.value = category
-  currentPage.value = 1 // 切换分类时重置页码
-  fetchPlaylists()
+// 处理分类选择
+function handleCategorySelect(key: string) {
+  currentCategory.value = key;
+  currentPage.value = 1;
+  fetchPlaylists();
 }
 
-// 切换页码
-function changePage(page) {
-  if (page < 1 || page > totalPages.value || page === currentPage.value) return
-  currentPage.value = page
-  fetchPlaylists()
+// 处理标签点击
+function handleTagClick(tag: string) {
+  currentCategory.value = tag;
+  currentPage.value = 1;
+  fetchPlaylists();
 }
 
+// 处理分页变化
+function handlePageChange(page: number) {
+  currentPage.value = page;
+  fetchPlaylists();
+}
+
+// 处理每页数量变化
+function handlePageSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
+  fetchPlaylists();
+}
+
+// 跳转到歌单详情
+function navigateToDetail(id: number) {
+  router.push(`/playlist/${id}`);
+}
+
+// 播放歌单
+async function playPlaylist(id: number) {
+  try {
+    // 获取歌单详情
+    const detailRes = await getPlaylistDetail(id);
+    if (!detailRes.playlist?.trackIds?.length) {
+      message.warning('歌单暂无歌曲');
+      return;
+    }
+
+    // 获取歌单歌曲
+    const trackIds = detailRes.playlist.trackIds.map(t => t.id);
+    const tracksRes = await getPlaylistTracks(id, trackIds);
+    if (!tracksRes.songs?.length) {
+      message.warning('获取歌曲失败');
+      return;
+    }
+
+    // 设置播放列表并播放
+    playerStore.setPlaylist(tracksRes.songs);
+    playerStore.play(0);
+    message.success('开始播放');
+  } catch (error) {
+    console.error('播放歌单失败:', error);
+    message.error('播放失败');
+  }
+}
+
+// 监听高质量开关变化
+watch(showHighQuality, () => {
+  currentPage.value = 1;
+  fetchPlaylists();
+});
+
+// 组件挂载时获取数据
 onMounted(async () => {
-  await fetchCategories()
-  await fetchPlaylists()
-})
+  await fetchCategories();
+  await fetchPlaylists();
+});
 </script>

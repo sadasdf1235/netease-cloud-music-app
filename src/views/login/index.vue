@@ -9,10 +9,10 @@
 
       <!-- 登录方式切换 -->
       <div class="flex border-b border-gray-200 dark:border-gray-700">
-        <button 
-          v-for="tab in loginTabs" 
+        <button
+          v-for="tab in loginTabs"
           :key="tab.key"
-          class="flex-1 py-3 text-center transition-colors" 
+          class="flex-1 py-3 text-center transition-colors"
           :class="currentTab === tab.key ? 'text-primary border-b-2 border-primary' : 'text-gray-600 dark:text-gray-400'"
           @click="currentTab = tab.key"
         >
@@ -43,10 +43,10 @@
             </n-form-item>
           </n-form>
           <div class="mt-6">
-            <n-button 
-              type="primary" 
-              block 
-              :loading="loginLoading" 
+            <n-button
+              type="primary"
+              block
+              :loading="loginLoading"
               @click="handlePhoneLogin"
             >
               登录
@@ -60,7 +60,7 @@
             <n-spin size="large" />
             <p class="mt-4 text-gray-600 dark:text-gray-400">二维码加载中...</p>
           </div>
-          
+
           <div v-else-if="qrStatus === 'expired'" class="py-8">
             <div class="text-gray-500 dark:text-gray-400 mb-4">
               <div class="i-carbon-warning text-4xl mx-auto"></div>
@@ -68,7 +68,7 @@
             </div>
             <n-button @click="getQrCode">刷新二维码</n-button>
           </div>
-          
+
           <div v-else class="py-4">
             <div class="qrcode-wrapper mx-auto mb-4 p-4 bg-white inline-block rounded">
               <img v-if="qrImg" :src="qrImg" alt="登录二维码" class="w-48 h-48" />
@@ -100,12 +100,13 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useMessage } from 'naive-ui'
 import { userApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const route = useRoute()
 const message = useMessage()
 const userStore = useUserStore()
 
@@ -149,18 +150,19 @@ const loginLoading = ref(false)
 async function handlePhoneLogin() {
   try {
     loginLoading.value = true
-    
+
     // 表单验证
     await formRef.value?.validate()
-    
+
     // 调用登录API
     const res = await userApi.loginByPhone(phoneForm.phone, phoneForm.password)
-    
+
     // 保存登录状态
     if (res.code === 200) {
       userStore.setLoginState(true, res.profile, res.cookie)
       message.success('登录成功')
-      router.push('/')
+      const redirect = route.query.redirect as string
+      router.replace(redirect || '/')
     } else {
       message.error(res.msg || '登录失败')
     }
@@ -184,25 +186,25 @@ let checkQrTimer: number | null = null
 async function getQrCode() {
   try {
     qrStatus.value = 'loading'
-    
+
     // 获取二维码key
     const keyRes = await userApi.getQrKey()
     if (keyRes.code !== 200) {
       throw new Error('获取二维码失败')
     }
-    
+
     qrKey.value = keyRes.data.unikey
-    
+
     // 获取二维码图片
     const qrRes = await userApi.getQrCode(qrKey.value)
     if (qrRes.code !== 200) {
       throw new Error('获取二维码失败')
     }
-    
+
     qrImg.value = qrRes.data.qrimg
     qrStatus.value = 'ready'
     qrCodeExpireTime.value = 300
-    
+
     // 开始检查二维码状态
     startCheckQrStatus()
   } catch (error) {
@@ -217,9 +219,9 @@ async function getQrCode() {
 async function checkQrStatus() {
   try {
     if (!qrKey.value) return
-    
+
     const res = await userApi.checkQrStatus(qrKey.value)
-    
+
     switch (res.code) {
       case 800:
         // 二维码过期
@@ -242,14 +244,15 @@ async function checkQrStatus() {
         // 登录成功
         stopCheckQrStatus()
         message.success('登录成功')
-        
+
         // 保存登录状态
         const cookie = res.cookie
         // 获取用户信息
         const userRes = await userApi.getUserAccount()
         if (userRes.code === 200) {
           userStore.setLoginState(true, userRes.profile, cookie)
-          router.push('/')
+          const redirect = route.query.redirect as string
+          router.replace(redirect || '/')
         }
         break
     }

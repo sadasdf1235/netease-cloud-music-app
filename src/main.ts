@@ -6,6 +6,13 @@ import router from './router'
 import directivesPlugin from './directives'
 import type { App as AppType } from 'vue'
 
+// 引入UI组件库
+import Antd from 'ant-design-vue'
+import 'ant-design-vue/dist/antd.less'
+
+// 引入全局样式
+import './styles/global.less'
+
 // 为调试扩展window对象类型
 declare global {
   interface Window {
@@ -26,6 +33,9 @@ app.use(createPinia())
 
 // 注册路由
 app.use(router)
+
+// 注册UI组件库
+app.use(Antd)
 
 // 注册全局指令
 app.use(directivesPlugin)

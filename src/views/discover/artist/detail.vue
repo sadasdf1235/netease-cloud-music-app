@@ -11,9 +11,9 @@
         ></div>
         <template v-else>
           <img
-            :src="artistDetail.artist?.picUrl + '?param=512y512'"
+            :src="artistDetail.picUrl + '?param=512y512'"
             class="w-full h-full object-cover"
-            :alt="artistDetail.artist?.name"
+            :alt="artistDetail.name"
           />
         </template>
       </div>
@@ -35,26 +35,23 @@
         </div>
         <template v-else>
           <h1 class="text-2xl font-bold mb-2">
-            {{ artistDetail.artist?.name }}
+            {{ artistDetail.name }}
           </h1>
           <div class="flex items-center text-sm text-gray-500 mb-4">
             <span
-              v-if="
-                artistDetail.artist?.alias &&
-                artistDetail.artist.alias.length > 0
-              "
+              v-if="artistDetail.alias && artistDetail.alias.length > 0"
               class="mr-4"
-              >别名：{{ artistDetail.artist.alias.join("/") }}</span
+              >别名：{{ artistDetail.alias.join("/") }}</span
             >
-            <span>单曲数：{{ artistSongs.songs?.length || 0 }}</span>
+            <span>单曲数：{{ artistSongs.length || 0 }}</span>
             <span class="mx-2">|</span>
-            <span>专辑数：{{ artistAlbums.hotAlbums?.length || 0 }}</span>
+            <span>专辑数：{{ artistAlbums.length || 0 }}</span>
           </div>
           <div
-            v-if="artistDetail.artist?.briefDesc"
+            v-if="artistDetail.briefDesc"
             class="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-3"
           >
-            {{ artistDetail.artist.briefDesc }}
+            {{ artistDetail.briefDesc }}
           </div>
           <div class="flex gap-3">
             <button
@@ -66,9 +63,10 @@
             </button>
             <button
               class="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-full flex items-center hover:bg-gray-100 dark:hover:bg-dark-800"
+              @click="handleFollow(artistDetail.id, artistDetail.followed)"
             >
               <div class="i-carbon-favorite mr-1"></div>
-              <span>收藏</span>
+              <span>{{ artistDetail.followed ? '已收藏' : '收藏' }}</span>
             </button>
           </div>
         </template>
@@ -83,7 +81,7 @@
 
       <!-- 歌曲列表 -->
       <MusicList
-        :tracks="artistSongs.songs || []"
+        :tracks="artistSongs"
         :loading="loading"
         :show-search="false"
         :show-count="false"
@@ -123,7 +121,7 @@
         </template>
         <template v-else>
           <AlbumCard
-            v-for="album in artistAlbums.hotAlbums"
+            v-for="album in artistAlbums"
             :key="album.id"
             :album="album"
             @play="playAlbum"
@@ -152,14 +150,14 @@
         </template>
         <template v-else>
           <ArtistCard
-            v-for="artist in similarArtists.artists"
+            v-for="artist in similarArtists"
             :key="artist.id"
             :artist="artist"
             :show-tags="false"
             :show-follow-button="true"
             @play="playArtistHotSongs"
-            @follow="followArtist"
-            @unfollow="unfollowArtist"
+            @follow="handleFollow"
+            @unfollow="handleFollow"
           />
         </template>
       </div>
@@ -171,14 +169,11 @@
 import { ref, onMounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { usePlayerStore } from "@/stores/player";
-import {
-  getArtistDetail,
-  getArtistSongs,
-  getArtistAlbums,
-  getSimilarArtists,
-} from "@/api/artist";
-import { getAlbumDetail } from "@/api/album";
-import { ElMessage } from "element-plus";
+import { artistApi, albumApi } from "@/api";
+import type { Artist, ArtistDetail, ArtistSong, ArtistAlbum } from "@/types/artist";
+import type { Album } from "@/types/album";
+import type { Song } from "@/types/song";
+import { useMessage } from "naive-ui";
 import MusicList from '@/components/common/MusicList.vue';
 import AlbumCard from '@/components/common/AlbumCard.vue';
 import ArtistCard from '@/components/common/ArtistCard.vue';
@@ -186,15 +181,16 @@ import ArtistCard from '@/components/common/ArtistCard.vue';
 const route = useRoute();
 const router = useRouter();
 const playerStore = usePlayerStore();
+const message = useMessage();
 
 // 加载状态
 const loading = ref(true);
 
 // 歌手详情数据
-const artistDetail = ref<any>({});
-const artistSongs = ref<any>({});
-const artistAlbums = ref<any>({});
-const similarArtists = ref<any>({});
+const artistDetail = ref<ArtistDetail>({} as ArtistDetail);
+const artistSongs = ref<ArtistSong[]>([]);
+const artistAlbums = ref<ArtistAlbum[]>([]);
+const similarArtists = ref<Artist[]>([]);
 
 // 格式化时间
 function formatDuration(duration: number) {
@@ -218,16 +214,16 @@ function navigateToAlbum(id: number) {
 
 // 播放歌曲
 function playSong(index: number) {
-  if (artistSongs.value.songs && artistSongs.value.songs.length > 0) {
-    playerStore.setPlaylist(artistSongs.value.songs);
+  if (artistSongs.value.length > 0) {
+    playerStore.setPlaylist(artistSongs.value);
     playerStore.play(index);
   }
 }
 
 // 播放全部热门歌曲
 function playAllHotSongs() {
-  if (artistSongs.value.songs && artistSongs.value.songs.length > 0) {
-    playerStore.setPlaylist(artistSongs.value.songs);
+  if (artistSongs.value.length > 0) {
+    playerStore.setPlaylist(artistSongs.value);
     playerStore.play(0);
   }
 }
@@ -235,13 +231,15 @@ function playAllHotSongs() {
 // 播放专辑
 async function playAlbum(id: number) {
   try {
-    const albumDetail = await getAlbumDetail(id);
-    if (albumDetail && albumDetail.songs && albumDetail.songs.length > 0) {
-      playerStore.setPlaylist(albumDetail.songs);
+    const response = await albumApi.getAlbumDetail(id);
+    const { songs } = response;
+    if (songs && songs.length > 0) {
+      playerStore.setPlaylist(songs);
       playerStore.play(0);
     }
   } catch (error) {
     console.error("播放专辑失败:", error);
+    message.error("播放专辑失败");
   }
 }
 
@@ -251,24 +249,25 @@ async function fetchArtistData(id: number) {
     loading.value = true;
 
     // 获取歌手详情
-    const detailRes = await getArtistDetail(id);
-    artistDetail.value = detailRes;
+    const detailResponse = await artistApi.getArtistDetail(id);
+    artistDetail.value = detailResponse.data;
 
     // 获取歌手热门歌曲
-    const songsRes = await getArtistSongs(id);
-    artistSongs.value = songsRes;
+    const songsResponse = await artistApi.getArtistHotSongs(id);
+    artistSongs.value = songsResponse.songs || [];
 
     // 获取歌手专辑
-    const albumsRes = await getArtistAlbums(id, 5);
-    artistAlbums.value = albumsRes;
+    const albumsResponse = await artistApi.getArtistAlbums(id, 5);
+    artistAlbums.value = albumsResponse.hotAlbums || [];
 
     // 获取相似歌手
-    const similarRes = await getSimilarArtists(id);
-    similarArtists.value = similarRes;
+    const similarResponse = await artistApi.getSimilarArtists(id);
+    similarArtists.value = similarResponse.artists || [];
 
     loading.value = false;
   } catch (error) {
     console.error("获取歌手详情失败:", error);
+    message.error("获取歌手详情失败");
     loading.value = false;
   }
 }
@@ -293,83 +292,73 @@ onMounted(() => {
 
 /**
  * 从列表中播放歌曲
- * @param data 包含歌曲和索引的对象
  */
-function playSongFromList(data: { track: any, index: number }) {
-  if (artistSongs.value.songs && artistSongs.value.songs.length > 0) {
-    playerStore.setPlaylist(artistSongs.value.songs);
+function playSongFromList(data: { track: ArtistSong; index: number }) {
+  if (artistSongs.value.length > 0) {
+    playerStore.setPlaylist(artistSongs.value);
     playerStore.play(data.index);
   }
 }
 
 /**
  * 添加歌曲到播放列表
- * @param track 歌曲对象
  */
-function addToPlaylist(track: any) {
-  // 检查歌曲是否已在播放列表中
-  const existingIndex = playerStore.playlist.findIndex((item: any) => item.id === track.id);
+function addToPlaylist(track: ArtistSong) {
+  const existingIndex = playerStore.playlist.findIndex((item: Song) => item.id === track.id);
 
   if (existingIndex === -1) {
-    // 添加到播放列表
-    const newPlaylist = [...playerStore.playlist, track];
-    playerStore.setPlaylist(newPlaylist);
-    ElMessage.success('已添加到播放列表');
+    playerStore.addToPlaylist(track);
+    message.success('已添加到播放列表');
   } else {
-    ElMessage.info('歌曲已在播放列表中');
+    message.info('歌曲已在播放列表中');
   }
 }
 
 /**
  * 切换歌曲喜欢状态
- * @param track 歌曲对象
  */
-function toggleLike(track: any) {
-  // 这里应该调用API来喜欢/取消喜欢歌曲
-  // 由于API未实现，这里只做提示
-  ElMessage.success(`${track.name} 已添加到我喜欢的音乐`);
+function toggleLike(track: ArtistSong) {
+  // TODO: 实现喜欢歌曲功能
+  message.success(`${track.name} 已添加到我喜欢的音乐`);
 }
 
 /**
  * 显示更多操作
- * @param track 歌曲对象
  */
-function showMoreActions(track: any) {
-  // 这里可以显示一个操作菜单，如下载、分享等
-  ElMessage.info('更多操作功能开发中');
+function showMoreActions(track: ArtistSong) {
+  // TODO: 实现更多操作功能
+  message.info('更多操作功能开发中');
 }
 
 /**
  * 播放艺术家热门歌曲
- * @param artistId 艺术家ID
  */
-function playArtistHotSongs(artistId: number) {
-  // 获取艺术家热门歌曲并播放
-  getArtistSongs(artistId).then(res => {
-    if (res.songs && res.songs.length > 0) {
-      playerStore.setPlaylist(res.songs);
+async function playArtistHotSongs(artistId: number) {
+  try {
+    const response = await artistApi.getArtistHotSongs(artistId);
+    const { songs } = response;
+    if (songs && songs.length > 0) {
+      playerStore.setPlaylist(songs);
       playerStore.play(0);
     }
-  });
+  } catch (error) {
+    console.error("播放歌手热门歌曲失败:", error);
+    message.error("播放歌手热门歌曲失败");
+  }
 }
 
 /**
- * 关注艺术家
- * @param artistId 艺术家ID
+ * 关注/取消关注艺术家
  */
-function followArtist(artistId: number) {
-  // 这里应该调用API来关注艺术家
-  // 由于API未实现，这里只做提示
-  ElMessage.success('关注成功');
-}
-
-/**
- * 取消关注艺术家
- * @param artistId 艺术家ID
- */
-function unfollowArtist(artistId: number) {
-  // 这里应该调用API来取消关注艺术家
-  // 由于API未实现，这里只做提示
-  ElMessage.success('已取消关注');
+async function handleFollow(artistId: number, isFollowed: boolean) {
+  try {
+    await artistApi.followArtist(artistId, isFollowed ? 2 : 1);
+    message.success(isFollowed ? '已取消关注' : '关注成功');
+    // 重新获取歌手详情，更新关注状态
+    fetchArtistData(artistId);
+  } catch (error) {
+    console.error("关注/取消关注歌手失败:", error);
+    message.error("操作失败，请稍后重试");
+  }
 }
 </script>
