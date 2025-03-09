@@ -1,0 +1,95 @@
+// 清除浮动
+.clearfix() {
+  &::before,
+  &::after {
+    content: '';
+    display: table;
+  }
+  &::after {
+    clear: both;
+  }
+}
+
+// 文本溢出省略号
+.text-ellipsis() {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// 多行文本溢出省略号
+.text-ellipsis-multiple(@line: 2) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: @line;
+  overflow: hidden;
+}
+
+// flex布局
+.flex-center() {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between() {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.flex-start() {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.flex-end() {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+// 定位
+.absolute-center() {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.fixed-center() {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+// 响应式
+.responsive(@breakpoint) {
+  @media only screen and (max-width: @breakpoint) {
+    @content();
+  }
+}
+
+// 渐变背景
+.gradient-background(@start-color: #fff, @end-color: #000, @deg: 45deg) {
+  background: linear-gradient(@deg, @start-color, @end-color);
+}
+
+// 阴影
+.box-shadow(@x: 0, @y: 2px, @blur: 12px, @color: rgba(0, 0, 0, 0.08)) {
+  box-shadow: @arguments;
+}
+
+// 过渡
+.transition(@property: all, @duration: 0.3s, @timing: ease-in-out) {
+  transition: @property @duration @timing;
+}
+
+// 动画
+.keyframes(@name, @frames) {
+  @keyframes @name {
+    @frames();
+  }
+}
