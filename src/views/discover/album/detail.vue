@@ -107,17 +107,26 @@
         </template>
       </div>
     </div>
+
+    <!-- 评论区 -->
+    <div class="mt-8">
+      <CommentSection
+        :resource-id="albumId"
+        :resource-type="3"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePlayerStore } from '@/stores/player';
 import { useMessage } from 'naive-ui';
 import { getAlbumDetail, getRelatedAlbums } from '@/api/album';
 import MusicList from '@/components/common/MusicList.vue';
 import AlbumCard from '@/components/common/AlbumCard.vue';
+import CommentSection from '@/components/common/CommentSection.vue';
 
 const route = useRoute();
 const router = useRouter();

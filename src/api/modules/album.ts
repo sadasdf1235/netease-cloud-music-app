@@ -5,6 +5,7 @@
 import request from '@/utils/request';
 import type { Album, AlbumDetail, AlbumDynamic, NewAlbumParams } from '@/types/album';
 import type { Song } from '@/types/song';
+import { get } from '@/utils/request';
 
 interface BaseResponse {
   code: number;
@@ -94,3 +95,11 @@ export const getAlbumComments = (id: number, limit = 20, offset = 0, before?: nu
 export const getArtistAlbums = (id: number, limit = 30, offset = 0): Promise<ArtistAlbumsResponse> => {
   return request.get<ArtistAlbumsResponse>('/artist/album', { params: { id, limit, offset } });
 };
+
+/**
+ * 获取相关专辑
+ * @param id 专辑id
+ */
+export function getRelatedAlbums(id: number) {
+  return get('/album/related', { id });
+}
