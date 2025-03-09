@@ -106,7 +106,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
-import { getPlaylistDetail, getPlaylistTracks } from '@/api/music'
+import { getPlaylistDetail, getPlaylistTracks } from '@/api/modules/playlist'
 import { useMessage } from 'naive-ui'
 import MusicList from '@/components/common/MusicList.vue'
 

@@ -215,8 +215,23 @@ pnpm build
 - 添加`withSimpleCache`函数，统一API缓存调用方式
 - 修改了所有使用缓存的API函数，确保接口一致
 
+### API类型优化
+
+- 创建了`src/types/api/common.ts`，提供统一的API响应类型定义
+- 完善了`src/types/api/playlist.ts`，为所有歌单相关API提供明确的类型
+- 修复了`src/types/api/music.ts`中的类型定义，减少any类型的使用
+- 统一了API类型导出方式，避免循环引用问题
+
+### API模块化完善
+
+- 将`src/api/music.ts`和`src/api/toplist.ts`迁移到modules目录
+- 统一了所有API模块的实现方式，包括缓存机制和类型定义
+- 更新了组件中的API导入路径，确保使用新的模块化文件
+- 保留了兼容性导出，减少对现有代码的影响
+
 ### 优化方向
 
-- 将来可考虑进一步统一`music.ts`和`toplist.ts`到modules目录
-- 完善API响应类型定义，减少any类型的使用
-- 增加请求错误处理和重试机制
+- 完善API响应类型定义，进一步减少any类型的使用
+- 增强错误处理机制，提供更友好的错误提示
+- 添加请求重试和超时处理，提高API调用的可靠性
+- 考虑引入API请求状态管理，统一处理加载状态和错误状态
