@@ -4,6 +4,9 @@
     <header class="h-16 bg-white dark:bg-dark-900 shadow-sm border-b border-gray-200 dark:border-gray-800">
       <div class="flex items-center justify-between h-full px-4">
         <div class="flex items-center gap-4">
+          <!-- 移动端导航 -->
+          <MobileNav class="md:hidden" />
+
           <!-- Logo -->
           <div class="text-xl font-bold text-primary">网易云音乐</div>
 
@@ -55,9 +58,20 @@
       </div>
     </header>
 
-    <!-- 主内容区域 -->
+    <!-- 主要内容区域 -->
     <main class="flex-1 overflow-auto">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <transition
+          enter-active-class="transition-opacity duration-200"
+          enter-from-class="opacity-0"
+          enter-to-class="opacity-100"
+          leave-active-class="transition-opacity duration-200"
+          leave-from-class="opacity-100"
+          leave-to-class="opacity-0"
+        >
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </main>
 
     <!-- 播放器栏 -->
@@ -79,6 +93,7 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import PlaylistPanel from '@/components/common/PlaylistPanel.vue'
 import MusicPlayer from '@/components/player/index.vue'
 import { useRouter } from 'vue-router'
+import MobileNav from '@/components/common/MobileNav.vue'
 
 const userStore = useUserStore()
 const playerStore = usePlayerStore()
@@ -98,11 +113,10 @@ function togglePlaylistPanel() {
 // 导航项
 const navItems = [
   { name: '发现音乐', path: '/discover' },
-  { name: '我的音乐', path: '/my' },
-  { name: '关注', path: '/follow' },
-  { name: '商城', path: '/store' },
-  { name: '音乐人', path: '/musician' },
-  { name: '下载客户端', path: '/download' },
+  { name: '推荐歌单', path: '/discover/playlist' },
+  { name: '排行榜', path: '/discover/toplist' },
+  { name: '歌手', path: '/discover/artist' },
+  { name: '新碟上架', path: '/discover/album' }
 ]
 
 // 切换播放模式
@@ -122,11 +136,34 @@ function togglePlayMode() {
  * 处理搜索
  */
 function handleSearch() {
-  if (!searchKeyword.value.trim()) return;
-  router.push(`/search?keywords=${encodeURIComponent(searchKeyword.value.trim())}`);
-  searchKeyword.value = '';
+  if (searchKeyword.value.trim()) {
+    router.push({
+      path: '/search',
+      query: { keywords: searchKeyword.value.trim() }
+    });
+  }
 }
 
 // 由于我们使用了新的MusicPlayer组件，下面的播放器相关代码可以移除
 // 这些功能已经在MusicPlayer组件中实现
 </script>
+
+<style scoped>
+/* 自定义滚动条样式 */
+main::-webkit-scrollbar {
+  width: 6px;
+}
+
+main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+main::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.dark main::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+</style>

@@ -8,3 +8,6 @@ export { default as useLocalStorage } from './useLocalStorage';
 
 // 导出播放器Hook
 export { default as usePlayer } from './usePlayer';
+
+// 导出主题管理Hook
+export { default as useTheme } from './useTheme';
