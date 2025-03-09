@@ -67,10 +67,7 @@ export function formatDate(timestamp: number, format: string = 'YYYY-MM-DD'): st
  */
 export function msToMinuteSecond(ms: number): string {
   if (!ms || isNaN(ms)) return '00:00';
-
-  // 转换为秒
-  const seconds = Math.floor(ms / 1000);
-  return formatTime(seconds);
+  return formatTime(Math.floor(ms / 1000));
 }
 
 /**
@@ -81,7 +78,6 @@ export function msToMinuteSecond(ms: number): string {
 export function msToTime(ms: number): string {
   if (!ms || isNaN(ms)) return '00:00:00';
 
-  // 转换为秒
   const seconds = Math.floor(ms / 1000);
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
@@ -100,8 +96,9 @@ export function msToTime(ms: number): string {
  * @returns 格式化后的时间字符串
  */
 export function formatDuration(duration: number): string {
-  if (!duration) return '00:00';
-  return formatTime(duration / 1000);
+  const minutes = Math.floor(duration / 1000 / 60);
+  const seconds = Math.floor((duration / 1000) % 60);
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 }
 
 /**
@@ -112,4 +109,63 @@ export function formatDuration(duration: number): string {
 export function formatArtists(artists: any[]): string {
   if (!artists || !artists.length) return '';
   return artists.map(artist => artist.name).join('/');
+}
+
+/**
+ * 格式化时间为相对时间
+ * @param timestamp 时间戳
+ * @returns 相对时间字符串
+ */
+export function formatTimeAgo(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+
+  // 小于1分钟
+  if (diff < 60 * 1000) {
+    return '刚刚';
+  }
+
+  // 小于1小时
+  if (diff < 60 * 60 * 1000) {
+    return Math.floor(diff / (60 * 1000)) + '分钟前';
+  }
+
+  // 小于24小时
+  if (diff < 24 * 60 * 60 * 1000) {
+    return Math.floor(diff / (60 * 60 * 1000)) + '小时前';
+  }
+
+  // 小于30天
+  if (diff < 30 * 24 * 60 * 60 * 1000) {
+    return Math.floor(diff / (24 * 60 * 60 * 1000)) + '天前';
+  }
+
+  // 超过30天显示具体日期
+  return formatDate(timestamp);
+}
+
+/**
+ * 格式化数字
+ * @param num 数字
+ * @returns 格式化后的字符串
+ */
+export function formatNumber(num: number): string {
+  if (num < 10000) {
+    return num.toString();
+  }
+  if (num < 100000000) {
+    return (num / 10000).toFixed(1) + '万';
+  }
+  return (num / 100000000).toFixed(1) + '亿';
+}
+
+/**
+ * 格式化歌词时间
+ * @param time 时间（秒）
+ */
+export function formatLyricTime(time: number): string {
+  const minutes = Math.floor(time / 60);
+  const seconds = Math.floor(time % 60);
+  const milliseconds = Math.floor((time % 1) * 100);
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
 }
