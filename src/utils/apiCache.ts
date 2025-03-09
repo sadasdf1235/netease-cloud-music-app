@@ -6,8 +6,69 @@
 interface CacheItem<T> {
   data: T;
   timestamp: number;
-  expires: number;
+  ttl: number;
 }
+
+const cache = new Map<string, CacheItem<any>>();
+
+/**
+ * 获取缓存数据
+ * @param key 缓存键
+ * @returns 缓存数据，如果过期或不存在则返回null
+ */
+export function getCacheData<T>(key: string): T | null {
+  const item = cache.get(key);
+  if (!item) return null;
+
+  const now = Date.now();
+  if (now - item.timestamp > item.ttl) {
+    cache.delete(key);
+    return null;
+  }
+
+  return item.data;
+}
+
+/**
+ * 设置缓存数据
+ * @param key 缓存键
+ * @param data 缓存数据
+ * @param ttl 过期时间（毫秒）
+ */
+export function setCacheData<T>(key: string, data: T, ttl: number): void {
+  cache.set(key, {
+    data,
+    timestamp: Date.now(),
+    ttl
+  });
+}
+
+/**
+ * 清除缓存数据
+ * @param key 缓存键，如果不传则清除所有缓存
+ */
+export function clearCache(key?: string): void {
+  if (key) {
+    cache.delete(key);
+  } else {
+    cache.clear();
+  }
+}
+
+/**
+ * 清除过期缓存
+ */
+export function clearExpiredCache(): void {
+  const now = Date.now();
+  for (const [key, item] of cache.entries()) {
+    if (now - item.timestamp > item.ttl) {
+      cache.delete(key);
+    }
+  }
+}
+
+// 定期清理过期缓存
+setInterval(clearExpiredCache, 5 * 60 * 1000);
 
 interface CacheOptions {
   /** 缓存时间（毫秒） */
@@ -42,7 +103,7 @@ class ApiCache {
    * @returns 是否过期
    */
   private isExpired(item: CacheItem<any>): boolean {
-    return Date.now() - item.timestamp > item.expires;
+    return Date.now() - item.timestamp > item.ttl;
   }
 
   /**
@@ -58,7 +119,7 @@ class ApiCache {
     this.cache.set(cacheKey, {
       data,
       timestamp: Date.now(),
-      expires,
+      ttl: expires,
     });
   }
 

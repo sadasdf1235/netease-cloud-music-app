@@ -1,20 +1,18 @@
-import axios from 'axios';
-import type { AxiosInstance, AxiosRequestConfig } from 'axios';
+import axios, { type AxiosInstance, type AxiosRequestConfig } from 'axios';
 import { message } from 'ant-design-vue';
-import apiCache, { withCache } from './apiCache';
 import { useUserStore } from '@/stores/user';
+import { getCacheData, setCacheData } from './apiCache';
 
 // 创建axios实例
 const request: AxiosInstance = axios.create({
-  baseURL: 'http://localhost:3000', // 本地开发环境
-  timeout: 15000, // 请求超时时间
-  withCredentials: true // 允许跨域携带cookie
+  baseURL: import.meta.env.VITE_API_URL,
+  timeout: 15000,
+  withCredentials: true
 });
 
 // 请求拦截器
 request.interceptors.request.use(
   (config) => {
-    // 在发送请求之前做些什么
     const userStore = useUserStore();
     if (userStore.cookie) {
       config.params = { ...config.params, cookie: userStore.cookie };
@@ -22,7 +20,6 @@ request.interceptors.request.use(
     return config;
   },
   (error) => {
-    // 对请求错误做些什么
     message.error('请求发送失败');
     return Promise.reject(error);
   }
@@ -31,11 +28,9 @@ request.interceptors.request.use(
 // 响应拦截器
 request.interceptors.response.use(
   (response) => {
-    // 对响应数据做点什么
     return response.data;
   },
   (error) => {
-    // 对响应错误做点什么
     if (error.response) {
       switch (error.response.status) {
         case 401:
@@ -63,34 +58,40 @@ request.interceptors.response.use(
 /**
  * GET请求
  * @param url 请求地址
- * @param config 配置项
- * @returns Promise
+ * @param params 请求参数
  */
-export function get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  return request.get<any, T>(url, config);
+export function get<T>(url: string, params?: Record<string, any>): Promise<T> {
+  return request.get(url, { params });
 }
 
 /**
  * POST请求
  * @param url 请求地址
  * @param data 请求数据
- * @param config 配置项
- * @returns Promise
+ * @param config 请求配置
  */
 export function post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-  return request.post<any, T>(url, data, config);
+  return request.post(url, data, config);
 }
 
 /**
  * 带缓存的GET请求
  * @param url 请求地址
- * @param config 配置项
- * @returns Promise
+ * @param params 请求参数
+ * @param ttl 缓存时间（毫秒）
  */
-export function getCached<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
-  return withCache<T>(`${url}${config?.params ? JSON.stringify(config.params) : ''}`)(
-    () => get<T>(url, config)
-  );
+export function getCached<T>(url: string, params?: Record<string, any>, ttl = 5 * 60 * 1000): Promise<T> {
+  const cacheKey = `${url}?${JSON.stringify(params)}`;
+  const cachedData = getCacheData<T>(cacheKey);
+
+  if (cachedData) {
+    return Promise.resolve(cachedData);
+  }
+
+  return get<T>(url, params).then((data) => {
+    setCacheData(cacheKey, data, ttl);
+    return data;
+  });
 }
 
 export default request;

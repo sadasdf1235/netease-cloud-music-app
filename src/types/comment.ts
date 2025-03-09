@@ -1,32 +1,87 @@
+/**
+ * 评论相关类型定义
+ */
+
+/**
+ * 用户VIP权限
+ */
+interface VipRights {
+  associator?: {
+    vipCode: number;
+    rights: boolean;
+  };
+  musicPackage?: {
+    vipCode: number;
+    rights: boolean;
+  };
+  redVipAnnualCount: number;
+  redVipLevel: number;
+}
+
+/**
+ * 评论用户信息
+ */
+interface CommentUser {
+  userId: number;
+  nickname: string;
+  avatarUrl: string;
+  vipRights?: VipRights;
+  avatarDetail?: {
+    identityIconUrl: string;
+  };
+}
+
+/**
+ * 被回复的评论
+ */
+interface BeReplied {
+  user: CommentUser;
+  content: string;
+  status: number;
+  beRepliedCommentId: number;
+}
+
+/**
+ * 评论
+ */
 export interface Comment {
   commentId: number;
-  user: {
-    userId: number;
-    nickname: string;
-    avatarUrl: string;
-  };
+  user: CommentUser;
   content: string;
   time: number;
+  timeStr: string;
   likedCount: number;
   liked: boolean;
   replyCount: number;
+  showReplyList?: boolean;
   replies?: Comment[];
+  beReplied?: BeReplied[];
+  pendantData?: null;
+  decorations?: any[];
+  expressionUrl?: null;
 }
 
+/**
+ * 评论参数
+ */
 export interface CommentParams {
   id: number;
-  type: number; // 0: 歌曲, 1: mv, 2: 歌单, 3: 专辑, 4: 电台, 5: 视频, 6: 动态
+  type: number;
   pageNo?: number;
   pageSize?: number;
-  sortType?: number; // 1:按推荐排序, 2:按热度排序, 3:按时间排序
+  sortType?: number;
   cursor?: string;
+  before?: number;
 }
 
+/**
+ * 评论响应
+ */
 export interface CommentResponse {
+  code: number;
   comments: Comment[];
-  totalCount: number;
-  hasMore: boolean;
-  cursor?: string;
-  sortType: number;
   hotComments?: Comment[];
+  total: number;
+  more: boolean;
+  cursor?: string;
 }

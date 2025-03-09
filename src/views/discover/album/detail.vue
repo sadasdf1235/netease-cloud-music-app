@@ -7,9 +7,15 @@
         <template v-else>
           <img :src="albumDetail.album?.picUrl + '?param=512y512'" class="w-full h-full object-cover" :alt="albumDetail.album?.name" />
           <div class="absolute top-2 right-2 text-white text-xs px-2 py-1 rounded bg-black/50">
-            <div class="flex items-center">
-              <div class="i-carbon-music mr-1"></div>
-              <span>{{ albumDetail.songs?.length || 0 }}首</span>
+            <div class="flex items-center gap-2">
+              <div class="flex items-center">
+                <div class="i-carbon-music mr-1"></div>
+                <span>{{ albumDetail.songs?.length || 0 }}首</span>
+              </div>
+              <div class="flex items-center">
+                <div class="i-carbon-view mr-1"></div>
+                <span>{{ albumDynamic.playCount || 0 }}</span>
+              </div>
             </div>
           </div>
         </template>
@@ -38,6 +44,21 @@
             </div>
           </div>
 
+          <div class="flex items-center gap-4 text-sm text-gray-500 mb-4">
+            <div class="flex items-center">
+              <div class="i-carbon-favorite mr-1"></div>
+              <span>{{ albumDynamic.subCount || 0 }}</span>
+            </div>
+            <div class="flex items-center">
+              <div class="i-carbon-share mr-1"></div>
+              <span>{{ albumDynamic.shareCount || 0 }}</span>
+            </div>
+            <div class="flex items-center">
+              <div class="i-carbon-chat mr-1"></div>
+              <span>{{ albumDynamic.commentCount || 0 }}</span>
+            </div>
+          </div>
+
           <div v-if="albumDetail.album?.description" class="text-sm text-gray-600 dark:text-gray-400 mb-4" :class="{'line-clamp-3': !showFullDesc}">
             {{ albumDetail.album.description }}
           </div>
@@ -59,12 +80,15 @@
               @click="toggleCollect"
             >
               <div :class="isCollected ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'"></div>
+              <span class="ml-1">{{ isCollected ? '已收藏' : '收藏' }}</span>
             </button>
             <button class="icon-btn" @click="shareAlbum">
               <div class="i-carbon-share"></div>
+              <span class="ml-1">分享</span>
             </button>
             <button class="icon-btn" @click="downloadAlbum">
               <div class="i-carbon-download"></div>
+              <span class="ml-1">下载</span>
             </button>
           </div>
         </template>
@@ -130,7 +154,9 @@ import { ref, onMounted, watch, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { usePlayerStore } from '@/stores/player';
 import { useMessage } from 'naive-ui';
-import { getAlbumDetail, getRelatedAlbums } from '@/api/album';
+import { getAlbumDetail, getAlbumDynamic, subscribeAlbum, getRelatedAlbums } from '@/api/modules/album';
+import type { Album, AlbumDetail, AlbumDynamic } from '@/types/album';
+import type { Song } from '@/types/song';
 import MusicList from '@/components/common/MusicList.vue';
 import AlbumCard from '@/components/common/AlbumCard.vue';
 import CommentSection from '@/components/common/CommentSection.vue';
@@ -142,19 +168,34 @@ const playerStore = usePlayerStore();
 const message = useMessage();
 
 // 专辑ID - 从路由参数中获取
-const albumId = computed(() => Number(route.params.id));
+const albumId = computed(() => {
+  const id = Number(route.params.id);
+  return isNaN(id) ? 0 : id;
+});
 
 // 加载状态
 const loading = ref(true);
-// 收藏状态
-const isCollected = ref(false);
 // 显示完整描述
 const showFullDesc = ref(false);
 
 // 专辑详情数据
-const albumDetail = ref<any>({});
+const albumDetail = ref<{
+  album?: Album;
+  songs?: Song[];
+}>({});
+
+// 专辑动态信息
+const albumDynamic = ref<AlbumDynamic>({
+  commentCount: 0,
+  shareCount: 0,
+  subCount: 0,
+  likedCount: 0,
+  isSub: false,
+  playCount: 0
+});
+
 // 相关专辑
-const relatedAlbums = ref<any[]>([]);
+const relatedAlbums = ref<Album[]>([]);
 
 // 显示分享弹窗
 const showShareModal = ref(false);
@@ -165,12 +206,17 @@ const shareLink = computed(() => {
   return `${baseUrl}/album/${albumId.value}`;
 });
 
+// 是否已收藏
+const isCollected = computed(() => {
+  return albumDynamic.value?.isSub || false;
+});
+
 /**
  * 格式化日期
  * @param timestamp 时间戳
  * @returns 格式化后的日期
  */
-function formatDate(timestamp: number) {
+function formatDate(timestamp?: number) {
   if (!timestamp) return '';
   const date = new Date(timestamp);
   return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
@@ -192,9 +238,20 @@ function playAll() {
 /**
  * 切换收藏状态
  */
-function toggleCollect() {
-  isCollected.value = !isCollected.value;
-  message.success(isCollected.value ? '收藏成功' : '已取消收藏');
+async function toggleCollect() {
+  try {
+    const t = isCollected.value ? 2 : 1; // 1: 收藏, 2: 取消收藏
+    await subscribeAlbum(albumId.value, t);
+
+    // 更新动态信息
+    const dynamicRes = await getAlbumDynamic(albumId.value);
+    albumDynamic.value = dynamicRes.data;
+
+    message.success(isCollected.value ? '收藏成功' : '已取消收藏');
+  } catch (error) {
+    console.error('收藏操作失败:', error);
+    message.error('操作失败，请稍后重试');
+  }
 }
 
 /**
@@ -283,12 +340,22 @@ function playAlbum(id: number) {
  * @param id 专辑ID
  */
 async function fetchAlbumData(id: number) {
+  if (id === 0) {
+    message.error('无效的专辑ID');
+    router.push('/discover/album');
+    return;
+  }
+
   try {
     loading.value = true;
 
     // 获取专辑详情
     const res = await getAlbumDetail(id);
     albumDetail.value = res;
+
+    // 获取专辑动态信息
+    const dynamicRes = await getAlbumDynamic(id);
+    albumDynamic.value = dynamicRes.data;
 
     // 获取相关专辑
     const relatedRes = await getRelatedAlbums(id);
@@ -304,19 +371,15 @@ async function fetchAlbumData(id: number) {
 
 // 监听路由参数变化，重新获取数据
 watch(
-  () => route.params.id,
+  () => albumId.value,
   (newId) => {
-    if (newId) {
-      fetchAlbumData(Number(newId));
-    }
+    fetchAlbumData(newId);
   }
 );
 
 // 组件挂载时获取数据
 onMounted(() => {
-  if (albumId.value) {
-    fetchAlbumData(albumId.value);
-  }
+  fetchAlbumData(albumId.value);
 });
 </script>
 

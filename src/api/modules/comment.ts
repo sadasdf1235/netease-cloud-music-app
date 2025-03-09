@@ -28,7 +28,7 @@ export enum CommentType {
  * @param params 评论参数
  */
 export function getComments(params: CommentParams): Promise<CommentResponse> {
-  return get('/comment/new', params);
+  return get<CommentResponse>('/comment/new', { params });
 }
 
 /**
@@ -86,9 +86,8 @@ export function deleteComment(id: number, type: number, commentId: number): Prom
  * @param limit 取出数量，默认为20
  * @param offset 偏移数量，用于分页，默认为0
  * @param before 分页参数，上一页最后一项的time
- * @returns Promise<any> 热门评论数据
  */
-export function getHotComments(id: number, type: CommentType, limit = 20, offset = 0, before?: number) {
+export function getHotComments(id: number, type: CommentType, limit = 20, offset = 0, before?: number): Promise<CommentResponse> {
   const typeMap = [
     '/comment/music', // 歌曲
     '/comment/album', // 专辑
@@ -98,5 +97,5 @@ export function getHotComments(id: number, type: CommentType, limit = 20, offset
     '/comment/video' // 视频
   ];
 
-  return get(`${typeMap[type]}/hot`, { id, limit, offset, before });
+  return get<CommentResponse>(`${typeMap[type]}/hot`, { params: { id, limit, offset, before } });
 }

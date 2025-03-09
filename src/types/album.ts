@@ -1,7 +1,11 @@
+/**
+ * 专辑相关类型定义
+ */
+
 import type { Artist } from './artist';
 
 /**
- * 专辑类型
+ * 专辑信息
  */
 export interface Album {
   id: number;
@@ -9,44 +13,37 @@ export interface Album {
   picUrl: string;
   artist: Artist;
   artists: Artist[];
+  description?: string;
   publishTime: number;
   size: number;
-  songs?: number;
-  description?: string;
   company?: string;
-  subType?: string;
   type?: string;
   tags?: string[];
-  alias?: string[];
-  liked?: boolean;
+  paid: boolean;
+  onSale: boolean;
 }
 
 /**
- * 专辑详情类型
+ * 专辑详情
  */
 export interface AlbumDetail extends Album {
   info: {
     commentCount: number;
     shareCount: number;
     likedCount: number;
-    liked: boolean;
   };
-  songs: number;
-  description: string;
-  company: string;
-  briefDesc: string;
 }
 
 /**
- * 专辑动态信息类型
+ * 专辑动态信息
  */
 export interface AlbumDynamic {
   commentCount: number;
   shareCount: number;
-  likedCount: number;
-  liked: boolean;
   subCount: number;
-  subscribed: boolean;
+  likedCount: number;
+  isSub: boolean;
+  playCount: number;
 }
 
 /**

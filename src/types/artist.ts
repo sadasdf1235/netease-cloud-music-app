@@ -3,23 +3,22 @@ import type { Album } from './album';
 import type { MV } from './mv';
 
 /**
- * 歌手类型
+ * 歌手相关类型定义
+ */
+
+/**
+ * 歌手信息
  */
 export interface Artist {
   id: number;
   name: string;
-  picUrl: string;
+  picUrl?: string;
   alias?: string[];
   albumSize?: number;
   musicSize?: number;
   mvSize?: number;
-  briefDesc?: string;
   followed?: boolean;
-  identifyTag?: string[];
-  rank?: {
-    rank: number;
-    type: number;
-  };
+  briefDesc?: string;
 }
 
 /**
