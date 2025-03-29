@@ -244,10 +244,10 @@ import type {
   RecommendAlbum,
   RecommendArtist
 } from "@/types/models/recommend";
-import RecommendCard from '@/components/common/RecommendCard.vue';
-import MusicList from '@/components/common/MusicList.vue';
-import AlbumCard from '@/components/common/AlbumCard.vue';
-import ArtistCard from '@/components/common/ArtistCard.vue';
+import RecommendCard from '@/components/ui/RecommendCard.vue';
+import MusicList from '@/components/music/MusicList.vue';
+import AlbumCard from '@/components/music/AlbumCard.vue';
+import ArtistCard from '@/components/music/ArtistCard.vue';
 
 const router = useRouter();
 const playerStore = usePlayerStore();

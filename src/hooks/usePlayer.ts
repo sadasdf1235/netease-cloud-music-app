@@ -5,7 +5,7 @@
 import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
-import { getSongUrl, getSongDetail, getLyric } from '@/api/modules/music';
+import { getSongUrl, getSongDetail, getLyric } from '@/api/modules/music-song';
 import { formatTime } from '@/utils/format';
 import type { Song } from '@/types/models/song';
 import type { PlayerHookResult } from '@/types/components';

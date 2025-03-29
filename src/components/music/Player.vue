@@ -179,7 +179,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from "vue";
 import { usePlayerStore } from "@/stores/player";
-import { getSongUrl as apiGetSongUrl } from "@/api/music";
+import { getSongUrl as apiGetSongUrl } from "@/api/modules/music-song";
 
 // 播放器组件主要变量
 const audioRef = ref<HTMLAudioElement | null>(null);

@@ -174,9 +174,9 @@ import type { Artist, ArtistDetail, ArtistSong, ArtistAlbum } from "@/types/arti
 import type { Album } from "@/types/album";
 import type { Song } from "@/types/song";
 import { useMessage } from "naive-ui";
-import MusicList from '@/components/common/MusicList.vue';
-import AlbumCard from '@/components/common/AlbumCard.vue';
-import ArtistCard from '@/components/common/ArtistCard.vue';
+import MusicList from '@/components/music/MusicList.vue';
+import AlbumCard from '@/components/music/AlbumCard.vue';
+import ArtistCard from '@/components/music/ArtistCard.vue';
 
 const route = useRoute();
 const router = useRouter();

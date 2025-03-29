@@ -157,10 +157,10 @@ import { useMessage } from 'naive-ui';
 import { getAlbumDetail, getAlbumDynamic, subscribeAlbum, getRelatedAlbums } from '@/api/modules/album';
 import type { Album, AlbumDetail, AlbumDynamic } from '@/types/album';
 import type { Song } from '@/types/song';
-import MusicList from '@/components/common/MusicList.vue';
-import AlbumCard from '@/components/common/AlbumCard.vue';
+import MusicList from '@/components/music/MusicList.vue';
+import AlbumCard from '@/components/music/AlbumCard.vue';
 import CommentSection from '@/components/common/CommentSection.vue';
-import ShareModal from '@/components/common/ShareModal.vue';
+import ShareModal from '@/components/ui/ShareModal.vue';
 
 const route = useRoute();
 const router = useRouter();

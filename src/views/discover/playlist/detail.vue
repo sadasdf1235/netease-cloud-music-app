@@ -1,88 +1,96 @@
 <template>
   <div class="playlist-detail-page">
-    <!-- 歌单信息头部 -->
-    <div class="flex flex-col md:flex-row gap-6 mb-6">
-      <div class="relative w-64 h-64 flex-shrink-0 rounded-lg overflow-hidden shadow-md mx-auto md:mx-0">
-        <div v-if="loading" class="w-full h-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-        <template v-else>
-          <img :src="playlistInfo.coverImgUrl + '?param=512y512'" class="w-full h-full object-cover" :alt="playlistInfo.name" />
-          <div class="absolute top-2 right-2 text-white text-xs px-2 py-1 rounded bg-black/50">
-            <div class="flex items-center">
-              <div class="i-carbon-music mr-1"></div>
-              <span>{{ playlistInfo.trackCount }}首</span>
-            </div>
-          </div>
-          <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
-            <div class="flex items-center text-white text-sm">
-              <div class="i-carbon-play-filled mr-1"></div>
-              <span>{{ formatPlayCount(playlistInfo.playCount) }}</span>
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <div class="flex-1">
-        <div v-if="loading">
-          <div class="h-8 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
-          <div class="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3"></div>
-          <div class="h-4 w-96 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-          <div class="h-4 w-80 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+    <DataFetcher
+      :requestFn="getPlaylistDetail"
+      :params="{ id: playlistId }"
+      @success="handleSuccess"
+      @error="handleError"
+      loadingText="加载歌单..."
+      emptyText="暂无歌单信息"
+    >
+      <template #loading>
+        <n-spin size="medium" />
+      </template>
+      <template #error="{ error, retry }">
+        <div class="error-message">
+          <p>{{ error.message }}</p>
+          <n-button @click="retry">重试</n-button>
         </div>
-        <template v-else>
-          <h1 class="text-2xl font-bold mb-2">{{ playlistInfo.name }}</h1>
-          <div class="flex items-center text-sm text-gray-500 mb-4">
-            <img
-              v-if="playlistInfo.creator"
-              :src="playlistInfo.creator.avatarUrl + '?param=30y30'"
-              class="w-6 h-6 rounded-full mr-2"
-              :alt="playlistInfo.creator.nickname"
-            />
-            <span v-if="playlistInfo.creator" class="mr-4">{{ playlistInfo.creator.nickname }}</span>
-            <div class="flex items-center">
-              <div class="i-carbon-time mr-1"></div>
-              <span>创建于 {{ formatDate(playlistInfo.createTime) }}</span>
+      </template>
+      <template #default="{ data }">
+        <div class="flex flex-col md:flex-row gap-6 mb-6">
+          <div class="relative w-64 h-64 flex-shrink-0 rounded-lg overflow-hidden shadow-md mx-auto md:mx-0">
+            <img :src="data.coverImgUrl + '?param=512y512'" class="w-full h-full object-cover" :alt="data.name" />
+            <div class="absolute top-2 right-2 text-white text-xs px-2 py-1 rounded bg-black/50">
+              <div class="flex items-center">
+                <div class="i-carbon-music mr-1"></div>
+                <span>{{ data.trackCount }}首</span>
+              </div>
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+              <div class="flex items-center text-white text-sm">
+                <div class="i-carbon-play-filled mr-1"></div>
+                <span>{{ formatPlayCount(data.playCount) }}</span>
+              </div>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center gap-2 mb-3">
-            <span v-for="tag in playlistInfo.tags" :key="tag" class="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-dark-800">
-              {{ tag }}
-            </span>
-            <span v-if="!playlistInfo.tags || playlistInfo.tags.length === 0" class="text-xs text-gray-500">暂无标签</span>
-          </div>
+          <div class="flex-1">
+            <h1 class="text-2xl font-bold mb-2">{{ data.name }}</h1>
+            <div class="flex items-center text-sm text-gray-500 mb-4">
+              <img
+                v-if="data.creator"
+                :src="data.creator.avatarUrl + '?param=30y30'"
+                class="w-6 h-6 rounded-full mr-2"
+                :alt="data.creator.nickname"
+              />
+              <span v-if="data.creator" class="mr-4">{{ data.creator.nickname }}</span>
+              <div class="flex items-center">
+                <div class="i-carbon-time mr-1"></div>
+                <span>创建于 {{ formatDate(data.createTime) }}</span>
+              </div>
+            </div>
 
-          <div class="text-sm text-gray-600 dark:text-gray-400 mb-4" :class="{'line-clamp-2': !showFullDesc}">
-            {{ playlistInfo.description || '暂无简介' }}
-          </div>
-          <div v-if="playlistInfo.description && playlistInfo.description.length > 100" class="text-xs text-primary cursor-pointer mb-4" @click="showFullDesc = !showFullDesc">
-            {{ showFullDesc ? '收起' : '显示全部' }}
-          </div>
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <span v-for="tag in data.tags" :key="tag" class="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-dark-800">
+                {{ tag }}
+              </span>
+              <span v-if="!data.tags || data.tags.length === 0" class="text-xs text-gray-500">暂无标签</span>
+            </div>
 
-          <div class="flex flex-wrap items-center gap-3">
-            <button
-              class="px-6 py-2 rounded-full bg-primary text-white flex items-center gap-1"
-              @click="playAll"
-            >
-              <div class="i-carbon-play-filled"></div>
-              <span>播放全部</span>
-            </button>
-            <button
-              class="icon-btn"
-              :class="{'text-red-500': isCollected}"
-              @click="toggleCollect"
-            >
-              <div :class="isCollected ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'"></div>
-            </button>
-            <button class="icon-btn" @click="sharePlaylist">
-              <div class="i-carbon-share"></div>
-            </button>
-            <button class="icon-btn" @click="downloadPlaylist">
-              <div class="i-carbon-download"></div>
-            </button>
+            <div class="text-sm text-gray-600 dark:text-gray-400 mb-4" :class="{'line-clamp-2': !showFullDesc}">
+              {{ data.description || '暂无简介' }}
+            </div>
+            <div v-if="data.description && data.description.length > 100" class="text-xs text-primary cursor-pointer mb-4" @click="showFullDesc = !showFullDesc">
+              {{ showFullDesc ? '收起' : '显示全部' }}
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <button
+                class="px-6 py-2 rounded-full bg-primary text-white flex items-center gap-1"
+                @click="playAll"
+              >
+                <div class="i-carbon-play-filled"></div>
+                <span>播放全部</span>
+              </button>
+              <button
+                class="icon-btn"
+                :class="{'text-red-500': isCollected}"
+                @click="toggleCollect"
+              >
+                <div :class="isCollected ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'"></div>
+              </button>
+              <button class="icon-btn" @click="sharePlaylist">
+                <div class="i-carbon-share"></div>
+              </button>
+              <button class="icon-btn" @click="downloadPlaylist">
+                <div class="i-carbon-download"></div>
+              </button>
+            </div>
           </div>
-        </template>
-      </div>
-    </div>
+        </div>
+      </template>
+    </DataFetcher>
 
     <!-- 歌曲列表 -->
     <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
@@ -108,7 +116,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { getPlaylistDetail, getPlaylistTracks } from '@/api/modules/playlist'
 import { useMessage } from 'naive-ui'
-import MusicList from '@/components/common/MusicList.vue'
+import MusicList from '@/components/music/MusicList.vue'
+import DataFetcher from '@/components/ui/DataFetcher.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -318,51 +327,46 @@ function downloadPlaylist() {
   message.info('下载功能开发中...')
 }
 
-/**
- * 获取歌单详情
- * @description 获取歌单基本信息和歌曲列表
- */
-async function fetchPlaylistDetail() {
-  try {
-    loading.value = true
+const handleSuccess = (data: any) => {
+  playlistInfo.value = data;
+  loading.value = false;
+};
 
-    // 获取歌单基本信息
-    const detailRes = await getPlaylistDetail(playlistId.value)
-    if (detailRes.playlist) {
-      playlistInfo.value = detailRes.playlist
-    } else {
-      message.error('获取歌单信息失败')
-    }
+const handleError = (error: Error) => {
+  console.error('获取歌单详情失败:', error);
+  loading.value = false;
+};
 
-    // 获取歌单歌曲
-    const tracksRes = await getPlaylistTracks(playlistId.value)
-    if (tracksRes.songs) {
-      tracks.value = tracksRes.songs
-    } else {
-      message.warning('获取歌曲列表失败')
-    }
+const getPlaylistDetail = async () => {
+  loading.value = true;
+  const detailRes = await getPlaylistDetail(playlistId.value);
+  return detailRes;
+};
 
-    loading.value = false
-  } catch (error) {
-    console.error('获取歌单详情失败:', error)
-    message.error('获取歌单详情失败，请稍后重试')
-    loading.value = false
-  }
-}
+const getPlaylistTracks = async () => {
+  const tracksRes = await getPlaylistTracks(playlistId.value);
+  return tracksRes;
+};
 
 // 监听路由参数变化，重新获取数据
 watch(() => route.params.id, (newId) => {
   if (newId) {
-    fetchPlaylistDetail()
+    getPlaylistDetail()
   }
 })
 
 onMounted(() => {
   if (playlistId.value) {
-    fetchPlaylistDetail()
+    getPlaylistDetail()
   } else {
     message.error('歌单ID无效')
     router.push('/discover/playlist')
   }
 })
 </script>
+
+<style scoped>
+.playlist-detail-page {
+  padding: 20px;
+}
+</style>

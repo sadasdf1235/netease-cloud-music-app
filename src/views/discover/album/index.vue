@@ -115,7 +115,7 @@ import { getNewAlbums, getAlbumDetail } from '@/api/modules/album';
 import type { Album } from '@/types/album';
 import { usePlayerStore } from '@/stores/player';
 import { useThrottleFn, onClickOutside } from '@vueuse/core';
-import AlbumCard from '@/components/common/AlbumCard.vue';
+import AlbumCard from '@/components/music/AlbumCard.vue';
 import SearchHistory from '@/components/common/SearchHistory.vue';
 
 const router = useRouter();

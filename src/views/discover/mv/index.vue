@@ -94,7 +94,7 @@ import { useMessage } from 'naive-ui';
 import { getAllMVs } from '@/api/modules/mv';
 import type { MV } from '@/types/mv';
 import { useThrottleFn } from '@vueuse/core';
-import MVCard from '@/components/common/MVCard.vue';
+import MVCard from '@/components/music/MVCard.vue';
 
 const router = useRouter();
 const message = useMessage();

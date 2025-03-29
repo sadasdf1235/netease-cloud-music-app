@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Song } from '@/types/song'
 import { STORAGE_KEY, PLAY_MODE } from '@/constants/storage'
-import { getSongUrl, getLyric } from '@/api/song'
+import { getSongUrl, getLyric } from '@/api/modules/music-song'
 
 export const usePlayerStore = defineStore('player', {
   state: () => ({
