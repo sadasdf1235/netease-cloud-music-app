@@ -9,6 +9,9 @@
           placeholder="搜索音乐、歌手、歌词、用户"
           class="w-full py-3 px-5 pr-12 rounded-full bg-gray-100 dark:bg-dark-800 focus:outline-none focus:ring-2 focus:ring-primary"
           @keyup.enter="handleSearch"
+          @input="handleInput"
+          @focus="showSuggestions = true"
+          @blur="setTimeout(() => { showSuggestions = false }, 200)"
         />
         <button
           class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-primary"
@@ -16,6 +19,24 @@
         >
           <div class="i-carbon-search text-xl"></div>
         </button>
+
+        <!-- 搜索建议 -->
+        <div 
+          v-if="showSuggestions && searchSuggestions.length > 0" 
+          class="absolute z-10 w-full mt-2 bg-white dark:bg-dark-900 rounded-lg shadow-lg border border-gray-200 dark:border-dark-700 overflow-hidden"
+        >
+          <ul>
+            <li 
+              v-for="(suggestion, index) in searchSuggestions" 
+              :key="index" 
+              class="px-4 py-2 hover:bg-gray-100 dark:hover:bg-dark-800 cursor-pointer flex items-center"
+              @click="selectSuggestion(suggestion)"
+            >
+              <div class="i-carbon-search text-gray-400 mr-2"></div>
+              <span v-html="highlightKeyword(suggestion, searchKeyword)"></span>
+            </li>
+          </ul>
+        </div>
       </div>
     </div>
 
@@ -67,15 +88,36 @@
     <!-- 搜索结果 -->
     <div v-if="hasSearched">
       <div class="mb-6">
-        <h1 class="text-2xl font-bold">
+        <h1 class="text-2xl font-bold mb-4">
           <span class="text-primary">"{{ currentKeyword }}"</span> 的搜索结果
         </h1>
+        
+        <!-- 搜索结果分类标签栏 -->
+        <div class="border-b border-gray-200 dark:border-gray-700">
+          <div class="flex overflow-x-auto hide-scrollbar">
+            <button
+              v-for="(tab, index) in searchTabs"
+              :key="index"
+              class="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap"
+              :class="[
+                activeTab === tab.type 
+                  ? 'text-primary border-b-2 border-primary' 
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              ]"
+              @click="activeTab = tab.type"
+            >
+              {{ tab.name }}
+              <span v-if="tab.count" class="ml-1 text-xs text-gray-500">({{ formatCount(getTabCount(tab.type)) }})</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- 搜索结果组件 -->
       <SearchResults
         :keywords="currentKeyword"
         :loading="loading"
+        :active-tab="activeTab"
         :songs="searchResults.songs"
         :song-count="searchResults.songCount"
         :albums="searchResults.albums"
@@ -105,13 +147,14 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue';
 import { usePlayerStore } from '@/stores/player';
 import { useMessage } from 'naive-ui';
-import { search, getSearchHot, multiSearch } from '@/api/modules/search';
+import { search, getSearchHot, multiSearch, getSearchSuggest } from '@/api/modules/search';
 import { getAlbumDetail } from '@/api/modules/album';
 import { getArtistSongs } from '@/api/modules/artist';
 import { getPlaylistDetail, getPlaylistTracks } from '@/api/modules/playlist';
 import { SearchType } from '@/types/api/search';
 import SearchResults from './SearchResults.vue';
 import { useRoute } from 'vue-router';
+import type { SearchResult, SearchSuggestResponse } from '@/types/api/search';
 
 const playerStore = usePlayerStore();
 const message = useMessage();
@@ -129,17 +172,35 @@ const loading = ref(false);
 const hotSearches = ref<any[]>([]);
 // 搜索历史
 const searchHistory = ref<string[]>([]);
+// 搜索建议
+const searchSuggestions = ref<string[]>([]);
+// 是否显示搜索建议
+const showSuggestions = ref(false);
+// 搜索建议定时器
+const suggestTimer = ref<number | null>(null);
+
 // 搜索结果
-const searchResults = reactive({
-  songs: [] as any[],
+const searchResults = reactive<SearchResult>({
+  songs: [],
   songCount: 0,
-  albums: [] as any[],
+  albums: [],
   albumCount: 0,
-  artists: [] as any[],
+  artists: [],
   artistCount: 0,
-  playlists: [] as any[],
+  playlists: [],
   playlistCount: 0
 });
+
+// 搜索结果分类标签栏
+const searchTabs = [
+  { type: 'songs', name: '歌曲', count: 0 },
+  { type: 'albums', name: '专辑', count: 0 },
+  { type: 'artists', name: '艺术家', count: 0 },
+  { type: 'playlists', name: '歌单', count: 0 }
+];
+
+// 当前激活的标签
+const activeTab = ref('songs');
 
 /**
  * 处理搜索
@@ -166,7 +227,7 @@ async function handleSearch() {
       SearchType.ALBUM,
       SearchType.ARTIST,
       SearchType.PLAYLIST
-    ]);
+    ]) as SearchResult;
 
     // 更新搜索结果
     if (result) {
@@ -382,4 +443,90 @@ watch(
     }
   }
 );
+
+/**
+ * 处理输入
+ */
+function handleInput() {
+  // 实现防抖
+  if (suggestTimer.value) {
+    clearTimeout(suggestTimer.value);
+  }
+
+  // 如果输入框为空，清空建议
+  if (!searchKeyword.value.trim()) {
+    searchSuggestions.value = [];
+    return;
+  }
+
+  // 设置延迟，避免频繁请求
+  suggestTimer.value = window.setTimeout(async () => {
+    try {
+      const res = await getSearchSuggest(searchKeyword.value.trim()) as SearchSuggestResponse;
+      // 从结果中提取关键词
+      const suggestions: string[] = [];
+      
+      // 从不同类型的建议中提取名称
+      if (res.result?.songs) {
+        suggestions.push(...res.result.songs.map((song: { name: string }) => song.name));
+      }
+      if (res.result?.artists) {
+        suggestions.push(...res.result.artists.map((artist: { name: string }) => artist.name));
+      }
+      if (res.result?.albums) {
+        suggestions.push(...res.result.albums.map((album: { name: string }) => album.name));
+      }
+      if (res.result?.playlists) {
+        suggestions.push(...res.result.playlists.map((playlist: { name: string }) => playlist.name));
+      }
+
+      // 去重
+      searchSuggestions.value = [...new Set(suggestions)].slice(0, 10);
+    } catch (error) {
+      console.error('获取搜索建议失败:', error);
+      searchSuggestions.value = [];
+    }
+  }, 300); // 300ms延迟
+}
+
+/**
+ * 选择搜索建议
+ */
+function selectSuggestion(suggestion: string) {
+  searchKeyword.value = suggestion;
+  handleSearch();
+}
+
+/**
+ * 高亮关键词
+ */
+function highlightKeyword(text: string, keyword: string) {
+  const regex = new RegExp(`(${keyword})`, 'gi');
+  return text.replace(regex, '<span class="text-primary">$1</span>');
+}
+
+/**
+ * 获取指定类型的搜索结果数量
+ */
+function getTabCount(type: string) {
+  switch (type) {
+    case 'songs':
+      return searchResults.songCount;
+    case 'albums':
+      return searchResults.albumCount;
+    case 'artists':
+      return searchResults.artistCount;
+    case 'playlists':
+      return searchResults.playlistCount;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * 格式化搜索结果数量
+ */
+function formatCount(count: number) {
+  return count.toLocaleString();
+}
 </script>

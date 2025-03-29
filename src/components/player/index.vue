@@ -17,7 +17,7 @@
 
       <!-- 播放信息 -->
       <PlayerInfo
-        :song="playerStore.currentSong"
+        :song="playerStore.currentSong as Song | null"
         :isLiked="isLiked"
         @like="toggleLike"
         @show-playlist="showPlaylist = !showPlaylist"
@@ -45,7 +45,7 @@
 
         <!-- 歌词按钮 -->
         <PlayerLyric
-          :current-song="playerStore.currentSong"
+          :current-song="playerStore.currentSong as Song | null"
           :lyric-text="lyrics"
           :current-time="playerStore.currentTime"
           :duration="playerStore.duration"
@@ -121,13 +121,14 @@
    */
   import { ref, watch, onMounted } from 'vue';
   import { usePlayerStore } from '@/stores/player';
-  import type { SimpleSong } from '@/types/models/song';
+  import type { SimpleSong, Song } from '@/types/models/song';
   import PlayerInfo from './PlayerInfo.vue';
   import PlayerControls from './PlayerControls.vue';
   import PlayerProgress from './PlayerProgress.vue';
   import PlayerVolume from './PlayerVolume.vue';
   import PlayerLyric from './PlayerLyric.vue';
   import { getLyric } from '@/api/modules/music-song';
+  import type { LyricResponse } from '@/types/api';
 
   // 定义组件名称（避免与其他组件冲突）
   defineOptions({
@@ -156,7 +157,7 @@
     
     lyricsLoading.value = true;
     try {
-      const res = await getLyric(id);
+      const res = await getLyric(id) as LyricResponse;
       if (res.lrc && res.lrc.lyric) {
         lyrics.value = res.lrc.lyric;
       } else {
@@ -251,7 +252,7 @@
       // 单曲循环，重新播放当前歌曲
       if (audioRef.value) {
         audioRef.value.currentTime = 0;
-        audioRef.value.play().catch(error => {
+        audioRef.value.play().catch((error: Error) => {
           console.error('重新播放失败:', error);
         });
       }
@@ -270,7 +271,7 @@
 
     // 如果状态为播放中，尝试开始播放
     if (playerStore.playing && audioRef.value) {
-      audioRef.value.play().catch(error => {
+      audioRef.value.play().catch((error: Error) => {
         console.error('自动播放失败:', error);
         playerStore.togglePlay(); // 切换到暂停状态
       });
@@ -405,7 +406,7 @@
   // 监听当前歌曲变化
   watch(
     () => playerStore.currentSong,
-    (newSong) => {
+    (newSong: Song | null) => {
       if (newSong && newSong.id) {
         // 获取并设置歌曲URL
         currentSongUrl.value = getSongUrl(newSong.id);
@@ -433,10 +434,13 @@
       // 如果有当前歌曲且状态为播放中，尝试开始播放
       if (playerStore.currentSong && playerStore.playing) {
         // 设置音频源
-        currentSongUrl.value = getSongUrl(playerStore.currentSong.id);
+        const song = playerStore.currentSong as Song;
+        if (song.id) {
+          currentSongUrl.value = getSongUrl(song.id);
+        }
 
         // 尝试播放
-        audioRef.value.play().catch(error => {
+        audioRef.value.play().catch((error: Error) => {
           console.error('初始化播放失败:', error);
           if (playerStore.playing) {
             playerStore.togglePlay(); // 切换到暂停状态

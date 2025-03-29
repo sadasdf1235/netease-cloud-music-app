@@ -1,7 +1,7 @@
 <template>
   <div class="search-results">
     <!-- 歌曲结果 -->
-    <div v-if="songs && songs.length > 0" class="mb-8">
+    <div v-if="(activeTab === 'songs' || activeTab === 'all') && songs && songs.length > 0" class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-bold">歌曲</h2>
         <router-link
@@ -27,7 +27,7 @@
     </div>
 
     <!-- 专辑结果 -->
-    <div v-if="albums && albums.length > 0" class="mb-8">
+    <div v-if="(activeTab === 'albums' || activeTab === 'all') && albums && albums.length > 0" class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-bold">专辑</h2>
         <router-link
@@ -50,7 +50,7 @@
     </div>
 
     <!-- 歌手结果 -->
-    <div v-if="artists && artists.length > 0" class="mb-8">
+    <div v-if="(activeTab === 'artists' || activeTab === 'all') && artists && artists.length > 0" class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-bold">歌手</h2>
         <router-link
@@ -76,7 +76,7 @@
     </div>
 
     <!-- 歌单结果 -->
-    <div v-if="playlists && playlists.length > 0" class="mb-8">
+    <div v-if="(activeTab === 'playlists' || activeTab === 'all') && playlists && playlists.length > 0" class="mb-8">
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-xl font-bold">歌单</h2>
         <router-link
@@ -118,7 +118,7 @@
  * 搜索结果组件
  * @description 展示搜索结果，包括歌曲、专辑、歌手和歌单
  */
-import { computed, defineProps, defineEmits } from 'vue';
+import { computed } from 'vue';
 import { usePlayerStore } from '@/stores/player';
 import { useMessage } from 'naive-ui';
 import MusicList from '@/components/music/MusicList.vue';
@@ -199,6 +199,11 @@ const props = defineProps({
   playlistCount: {
     type: Number,
     default: 0
+  },
+  /** 当前激活的标签 */
+  activeTab: {
+    type: String,
+    default: 'all'
   }
 });
 

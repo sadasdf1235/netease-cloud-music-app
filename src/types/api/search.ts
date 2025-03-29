@@ -138,3 +138,25 @@ export interface SearchSuggestResponse {
   /** 状态码 */
   code: number;
 }
+
+/**
+ * 搜索结果类型（合并后的结果）
+ */
+export interface SearchResult {
+  /** 歌曲列表 */
+  songs: Song[];
+  /** 歌曲计数 */
+  songCount: number;
+  /** 专辑列表 */
+  albums: Album[];
+  /** 专辑计数 */
+  albumCount: number;
+  /** 艺术家列表 */
+  artists: Artist[];
+  /** 艺术家计数 */
+  artistCount: number;
+  /** 歌单列表 */
+  playlists: Playlist[];
+  /** 歌单计数 */
+  playlistCount: number;
+}
