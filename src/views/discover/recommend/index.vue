@@ -224,7 +224,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter } from "@/hooks/useRouter";
 import { usePlayerStore } from "@/stores/player";
 import { useMessage } from "naive-ui";
 import {
@@ -236,7 +236,8 @@ import {
   getPlaylistDetail,
   getPlaylistTracks,
   getArtistHotSongs
-} from "@/api/music";
+} from "@/api/modules/music-song";
+import { getAlbumDetail } from "@/api/modules/album";
 import type {
   Banner,
   RecommendPlaylistItem,
@@ -330,38 +331,21 @@ async function playSong(song: any) {
 
 // 播放专辑
 async function playAlbum(id: number) {
-  console.log("点击播放专辑, ID:", id);
   try {
     // 调用获取专辑详情的API，获取专辑中的歌曲
     const albumInfo = await getAlbumDetail(id);
     console.log("获取到专辑信息:", albumInfo);
 
     if (albumInfo.songs && albumInfo.songs.length > 0) {
-      console.log("设置播放列表, 歌曲数量:", albumInfo.songs.length);
       playerStore.setPlaylist(albumInfo.songs);
       playerStore.play(0);
-
-      // 确保播放状态设置为播放
-      if (!playerStore.playing) {
-        console.log("设置播放状态为true");
-        playerStore.togglePlay();
-      }
-
-      console.log("播放列表已设置，当前歌曲:", playerStore.currentSong?.name);
-      console.log("当前播放状态:", playerStore.playing ? "播放中" : "已暂停");
-
-      // 强制刷新播放状态
-      setTimeout(() => {
-        if (!playerStore.playing) {
-          console.log("播放状态仍为false，强制设置为true");
-          playerStore.togglePlay();
-        }
-      }, 300);
+      message.success("开始播放专辑");
     } else {
-      console.error("专辑中没有歌曲");
+      message.warning("专辑暂无歌曲");
     }
   } catch (error) {
-    console.error("播放专辑失败:", error);
+    console.error("获取专辑详情失败:", error);
+    message.error("播放失败，请稍后再试");
   }
 }
 
@@ -520,11 +504,17 @@ function toggleLike(track: any) {
  */
 function playArtistHotSongs(artistId: number) {
   // 获取艺术家热门歌曲并播放
-  getArtistHotSongs(artistId).then(res => {
+  getArtistHotSongs(artistId).then((res: any) => {
     if (res.songs && res.songs.length > 0) {
       playerStore.setPlaylist(res.songs);
       playerStore.play(0);
+      message.success("开始播放歌手热门歌曲");
+    } else {
+      message.warning("该歌手暂无热门歌曲");
     }
+  }).catch(err => {
+    console.error("获取歌手热门歌曲失败:", err);
+    message.error("播放失败，请稍后再试");
   });
 }
 

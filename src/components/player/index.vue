@@ -43,6 +43,21 @@
           @toggle-play-mode="togglePlayMode"
         />
 
+        <!-- 歌词按钮 -->
+        <PlayerLyric
+          :current-song="playerStore.currentSong"
+          :lyric-text="lyrics"
+          :current-time="playerStore.currentTime"
+          :duration="playerStore.duration"
+          :is-playing="playerStore.playing"
+          :play-mode="{ loop: playerStore.loop, random: playerStore.random }"
+          :loading="lyricsLoading"
+          @toggle-play="playerStore.togglePlay()"
+          @prev="playerStore.prev()"
+          @next="playerStore.next()"
+          @toggle-play-mode="togglePlayMode"
+        />
+
         <!-- 音量控制 -->
         <PlayerVolume
           :volume="playerStore.volume"
@@ -107,6 +122,12 @@
   import { ref, watch, onMounted } from 'vue';
   import { usePlayerStore } from '@/stores/player';
   import type { SimpleSong } from '@/types/models/song';
+  import PlayerInfo from './PlayerInfo.vue';
+  import PlayerControls from './PlayerControls.vue';
+  import PlayerProgress from './PlayerProgress.vue';
+  import PlayerVolume from './PlayerVolume.vue';
+  import PlayerLyric from './PlayerLyric.vue';
+  import { getLyric } from '@/api/modules/music-song';
 
   // 定义组件名称（避免与其他组件冲突）
   defineOptions({
@@ -121,6 +142,33 @@
   const isLiked = ref(false);
   const showPlaylist = ref(false);
   const audioError = ref<string | null>(null);
+
+  // 歌词相关
+  const lyrics = ref<string>('');
+  const lyricsLoading = ref(false);
+
+  /**
+   * 加载歌词
+   * @param id 歌曲ID
+   */
+  async function loadLyrics(id: number) {
+    if (!id) return;
+    
+    lyricsLoading.value = true;
+    try {
+      const res = await getLyric(id);
+      if (res.lrc && res.lrc.lyric) {
+        lyrics.value = res.lrc.lyric;
+      } else {
+        lyrics.value = '';
+      }
+    } catch (error: any) {
+      console.error('获取歌词失败:', error);
+      lyrics.value = '';
+    } finally {
+      lyricsLoading.value = false;
+    }
+  }
 
   /**
    * 切换播放模式
@@ -358,15 +406,19 @@
   watch(
     () => playerStore.currentSong,
     (newSong) => {
-      if (newSong) {
+      if (newSong && newSong.id) {
         // 获取并设置歌曲URL
         currentSongUrl.value = getSongUrl(newSong.id);
+
+        // 加载歌词
+        loadLyrics(newSong.id);
 
         // 检查歌曲是否在喜欢列表中
         // 这里简化处理，实际应用中应该检查真实数据
         isLiked.value = false;
       } else {
         currentSongUrl.value = '';
+        lyrics.value = '';
       }
     }
   );

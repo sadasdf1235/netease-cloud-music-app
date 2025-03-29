@@ -9,7 +9,7 @@ import { getSongUrl, getSongDetail, getLyric } from '@/api/modules/music-song';
 import { formatTime } from '@/utils/format';
 import type { Song } from '@/types/models/song';
 import type { PlayerHookResult } from '@/types/components';
-import type { SongUrlResponse } from '@/types/api/music';
+import type { SongUrlResponse, SongDetailResponse, LyricResponse } from '@/types/api';
 
 /**
  * 音乐播放器Hook
@@ -74,47 +74,47 @@ export function usePlayer(): PlayerHookResult {
    * @param id 歌曲ID
    */
   const loadSong = async (id: number) => {
-    if (!id) return;
+    if (!id) {
+      console.error('歌曲ID无效');
+      return;
+    }
+
+    loading.value = true;
+    currentTime.value = 0;
+    duration.value = 0;
+    errorMessage.value = '';
 
     try {
-      loading.value = true;
-      error.value = false;
-      errorMessage.value = '';
-
-      // 如果有正在播放的歌曲，先暂停
-      if (audioRef.value && !audioRef.value.paused) {
-        audioRef.value.pause();
-      }
-
       // 获取歌曲URL
-      const urlRes = await getSongUrl(id);
-      if (urlRes && urlRes.code === 200 && urlRes.data?.[0]?.url) {
-        if (audioRef.value) {
-          audioRef.value.src = urlRes.data[0].url;
+      const urlRes = await getSongUrl(id) as SongUrlResponse;
+      
+      if (urlRes && urlRes.code === 200 && urlRes.data?.[0]) {
+        const songData = urlRes.data[0];
+        if (!songData.url) {
+          errorMessage.value = '该歌曲暂无版权或为付费歌曲';
+          loading.value = false;
+          return;
         }
-      } else {
-        error.value = true;
-        errorMessage.value = '获取歌曲链接失败';
-        loading.value = false;
-        return;
+        if (audioRef.value) {
+          audioRef.value.src = songData.url;
+        }
       }
 
       // 获取歌曲详情
-      const detailRes = await getSongDetail(id);
+      const detailRes = await getSongDetail(id) as SongDetailResponse;
       if (detailRes && detailRes.code === 200 && detailRes.songs?.[0]) {
         currentSong.value = detailRes.songs[0];
       }
 
       // 获取歌词
-      const lyricRes = await getLyric(id);
+      const lyricRes = await getLyric(id) as LyricResponse;
       if (lyricRes && lyricRes.code === 200) {
         lyric.value = lyricRes.lrc?.lyric || '';
       }
 
       loading.value = false;
-    } catch (err: unknown) {
+    } catch (err) {
       console.error('加载歌曲失败:', err);
-      error.value = true;
       errorMessage.value = '加载歌曲失败，请稍后再试';
       loading.value = false;
     }
