@@ -1,0 +1,6 @@
+// ... existing code ...
+// 是否是暗色主题
+const isDark = computed(() => {
+  return themeVars.value.primaryColor === '#18181c';
+});
+// ... existing code ...

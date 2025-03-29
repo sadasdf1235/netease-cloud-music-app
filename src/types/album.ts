@@ -1,13 +1,19 @@
 /**
- * 专辑相关类型定义
+ * 专辑类型定义
+ * @description 导出统一的专辑相关类型，保持向后兼容
+ * @deprecated 这个文件已经被弃用，请直接使用 './models/music' 中的类型定义
  */
 
-import type { Artist } from './artist';
+// 从统一的类型定义中重新导出
+export { Album } from './models/music';
+
+// 额外的专辑相关类型，后续也应该迁移到统一的地方
+import type { Artist } from './models/music';
 
 /**
- * 专辑信息
+ * 专辑详情
  */
-export interface Album {
+export interface AlbumDetail {
   id: number;
   name: string;
   picUrl: string;
@@ -19,15 +25,7 @@ export interface Album {
   company?: string;
   type?: string;
   tags?: string[];
-  paid: boolean;
-  onSale: boolean;
-}
-
-/**
- * 专辑详情
- */
-export interface AlbumDetail extends Album {
-  info: {
+  info?: {
     commentCount: number;
     shareCount: number;
     likedCount: number;

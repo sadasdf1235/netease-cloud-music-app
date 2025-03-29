@@ -6,20 +6,18 @@
 // 导出API公共类型
 export * from './api/common';
 
-// 导出模型类型（优先）
-export * from './album';
-export * from './artist';
-export * from './comment';
-export * from './mv';
+// 导出统一的音乐相关类型（新增）
+export * from './models/music';
+
+// 导出其他模型类型
 export * from './playlist';
 export * from './recommend';
-export * from './song';
 export * from './toplist';
 
 // 使用重命名避免名称冲突
 import * as UserTypes from './user';
-import * as UserApiTypes from './api/user';
 export { UserTypes }; 
+
 // 选择性导出用户API类型
 export { 
   UserDetailResponse,
@@ -41,6 +39,6 @@ export * from './components';
 export * from './store/player';
 
 // 注意:
-// 1. 目前有些类型在模型和API目录中重复定义，后续需要清理
-// 2. API模块应该统一使用 /types/api 中的类型
-// 3. 组件应该统一使用 /types/models 中的类型
+// 1. 暂时保留旧的类型导出，以保证向后兼容
+// 2. 后续应统一使用 ./models/music 中的类型定义
+// 3. 后续清理工作中应移除重复的类型定义文件
