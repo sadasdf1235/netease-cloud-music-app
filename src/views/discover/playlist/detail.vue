@@ -93,7 +93,7 @@
     </DataFetcher>
 
     <!-- 歌曲列表 -->
-    <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
+    <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm mb-6">
       <MusicList
         :tracks="tracks"
         :loading="loading"
@@ -107,6 +107,38 @@
         @more-actions="showMoreActions"
       />
     </div>
+
+    <!-- 内容区域 - 分为主内容和侧边栏 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 主内容区 - 评论 -->
+      <div class="lg:col-span-2">
+        <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
+          <CommentList
+            :comments="comments"
+            :hot-comments="hotComments"
+            :total-count="commentCount"
+            :current-page="commentPage"
+            :page-size="commentPageSize"
+            :submitting="submittingComment"
+            :avatar-url="userInfo?.avatarUrl"
+            @submit-comment="handleCommentSubmit"
+            @like-comment="handleCommentLike"
+            @page-change="handleCommentPageChange"
+          />
+        </div>
+      </div>
+
+      <!-- 侧边栏 - 相似歌单 -->
+      <div class="lg:col-span-1">
+        <div class="bg-white dark:bg-dark-900 rounded-lg p-4 shadow-sm">
+          <SimilarPlaylists
+            :playlists="similarPlaylists"
+            :loading="loadingSimilarPlaylists"
+            @more="handleMoreSimilarPlaylists"
+          />
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -114,15 +146,25 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
-import { getPlaylistDetail, getPlaylistTracks } from '@/api/modules/playlist'
+import { getPlaylistDetail, getPlaylistTracks, getPlaylistComments, getSimilarPlaylists } from '@/api/modules/playlist'
+import { sendComment, likeComment } from '@/api/modules/comment'
 import { useMessage } from 'naive-ui'
+import { useUserStore } from '@/stores/user'
 import MusicList from '@/components/music/MusicList.vue'
 import DataFetcher from '@/components/ui/DataFetcher.vue'
+import CommentList from '@/components/common/CommentList.vue'
+import SimilarPlaylists from '@/components/music/SimilarPlaylists.vue'
+import type { Comment } from '@/types/comment'
+import type { Playlist } from '@/types/models/playlist'
 
 const route = useRoute()
 const router = useRouter()
 const playerStore = usePlayerStore()
+const userStore = useUserStore()
 const message = useMessage()
+
+// 用户信息
+const userInfo = computed(() => userStore.profile)
 
 /**
  * 歌单ID - 从路由参数中获取
@@ -156,8 +198,18 @@ const playlistInfo = ref({
 // 歌曲列表
 const tracks = ref([])
 
-// 搜索关键词
-const searchKeyword = ref('')
+// 评论相关数据
+const comments = ref<Comment[]>([])
+const hotComments = ref<Comment[]>([])
+const commentCount = ref(0)
+const commentPage = ref(1)
+const commentPageSize = ref(20)
+const loadingComments = ref(false)
+const submittingComment = ref(false)
+
+// 相似歌单相关数据
+const similarPlaylists = ref<Playlist[]>([])
+const loadingSimilarPlaylists = ref(false)
 
 /**
  * 过滤后的歌曲列表
@@ -327,9 +379,169 @@ function downloadPlaylist() {
   message.info('下载功能开发中...')
 }
 
+/**
+ * 加载歌单评论
+ * @param page 页码
+ * @param pageSize 每页条数
+ */
+async function loadComments(page = 1, pageSize = 20) {
+  try {
+    loadingComments.value = true
+    const result = await getPlaylistComments(playlistId.value, pageSize, (page - 1) * pageSize)
+
+    if (result && result.code === 200) {
+      comments.value = result.comments || []
+      // 只在第一页加载热门评论
+      if (page === 1) {
+        hotComments.value = result.hotComments || []
+      }
+      commentCount.value = result.total || 0
+    } else {
+      message.error('获取评论失败')
+    }
+  } catch (error) {
+    console.error('加载评论出错:', error)
+    message.error('加载评论出错')
+  } finally {
+    loadingComments.value = false
+  }
+}
+
+/**
+ * 处理评论分页变化
+ * @param page 新的页码
+ */
+function handleCommentPageChange(page: number) {
+  commentPage.value = page
+  loadComments(page, commentPageSize.value)
+}
+
+/**
+ * 处理评论点赞
+ * @param comment 评论对象
+ */
+async function handleCommentLike(comment: Comment) {
+  if (!userInfo.value) {
+    message.warning('请先登录')
+    return
+  }
+
+  try {
+    const t = comment.liked ? 0 : 1 // 0: 取消赞, 1: 点赞
+    const result = await likeComment(
+      playlistId.value,
+      2, // 2: 歌单
+      comment.commentId,
+      !comment.liked
+    )
+
+    if (result && result.code === 200) {
+      // 更新本地评论数据
+      comment.liked = !comment.liked
+      if (comment.liked) {
+        comment.likedCount++
+      } else {
+        comment.likedCount--
+      }
+      message.success(comment.liked ? '点赞成功' : '已取消点赞')
+    } else {
+      message.error(result.msg || '操作失败')
+    }
+  } catch (error) {
+    console.error('点赞评论出错:', error)
+    message.error('操作失败，请稍后再试')
+  }
+}
+
+/**
+ * 处理提交评论
+ * @param data 评论数据
+ */
+async function handleCommentSubmit(data: { content: string, replyTo: Comment | null }) {
+  if (!userInfo.value) {
+    message.warning('请先登录')
+    return
+  }
+
+  try {
+    submittingComment.value = true
+    let result;
+    
+    // 区分发送评论和回复评论
+    if (data.replyTo) {
+      // 回复评论
+      result = await sendComment(
+        playlistId.value,
+        2, // 2: 歌单
+        data.content,
+        data.replyTo.commentId
+      )
+    } else {
+      // 发送评论
+      result = await sendComment(
+        playlistId.value,
+        2, // 2: 歌单
+        data.content
+      )
+    }
+
+    if (result && result.code === 200) {
+      message.success('评论发表成功')
+      // 重新加载评论
+      loadComments(1, commentPageSize.value)
+      // 重置到第一页
+      commentPage.value = 1
+    } else {
+      message.error(result.msg || '评论发表失败')
+    }
+  } catch (error) {
+    console.error('发表评论出错:', error)
+    message.error('发表评论失败，请稍后再试')
+  } finally {
+    submittingComment.value = false
+  }
+}
+
+/**
+ * 加载相似歌单
+ */
+async function loadSimilarPlaylists() {
+  try {
+    loadingSimilarPlaylists.value = true
+    const result = await getSimilarPlaylists(playlistId.value)
+
+    if (result && result.code === 200) {
+      similarPlaylists.value = result.playlists || []
+    } else {
+      console.error('获取相似歌单失败:', result.msg)
+    }
+  } catch (error) {
+    console.error('加载相似歌单出错:', error)
+  } finally {
+    loadingSimilarPlaylists.value = false
+  }
+}
+
+/**
+ * 处理查看更多相似歌单
+ */
+function handleMoreSimilarPlaylists() {
+  // 此处可以跳转到相似歌单列表页或展开显示更多
+  message.info('查看更多相似歌单功能开发中...')
+}
+
 const handleSuccess = (data: any) => {
   playlistInfo.value = data;
   loading.value = false;
+  
+  // 加载歌曲列表
+  loadPlaylistTracks();
+  
+  // 加载评论
+  loadComments();
+  
+  // 加载相似歌单
+  loadSimilarPlaylists();
 };
 
 const handleError = (error: Error) => {
@@ -343,9 +555,15 @@ const getPlaylistDetail = async () => {
   return detailRes;
 };
 
-const getPlaylistTracks = async () => {
-  const tracksRes = await getPlaylistTracks(playlistId.value);
-  return tracksRes;
+const loadPlaylistTracks = async () => {
+  try {
+    const tracksRes = await getPlaylistTracks(playlistId.value);
+    if (tracksRes && tracksRes.code === 200) {
+      tracks.value = tracksRes.songs || [];
+    }
+  } catch (error) {
+    console.error('获取歌单歌曲失败:', error);
+  }
 };
 
 // 监听路由参数变化，重新获取数据

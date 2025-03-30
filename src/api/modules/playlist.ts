@@ -128,3 +128,12 @@ export function getUserPlaylists(uid: number, limit = 30, offset = 0) {
 export function getPlaylistComments(id: number, limit = 20, offset = 0, before?: number) {
   return get<PlaylistCommentsResponse>('/comment/playlist', { id, limit, offset, before });
 }
+
+/**
+ * 获取相似歌单
+ * @param id 歌单ID
+ * @returns 相似歌单列表
+ */
+export async function getSimilarPlaylists(id: number): Promise<any> {
+  return get<any>('/simi/playlist', { params: { id } });
+}
