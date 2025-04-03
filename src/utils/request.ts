@@ -3,10 +3,17 @@
  * @description 基于axios封装的HTTP请求工具，支持请求缓存和错误处理
  */
 import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosError } from 'axios';
-import { message } from 'ant-design-vue';
 import { useUserStore } from '@/stores/user';
 import { getCacheData, setCacheData } from './apiCache';
-import { handleApiError, globalErrorHandler, ErrorType, createError } from './errorHandler';
+import { handleApiError, globalErrorHandler, ErrorType, createError, type SimpleMessageApi } from './errorHandler';
+
+// 创建全局消息实例
+const message: SimpleMessageApi = {
+  error: (content: string) => console.error(content),
+  warning: (content: string) => console.warn(content),
+  info: (content: string) => console.info(content),
+  success: (content: string) => console.log(content)
+};
 
 /**
  * 默认请求配置

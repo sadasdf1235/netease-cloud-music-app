@@ -93,7 +93,7 @@ import ThemeToggle from '@/components/ui/ThemeToggle.vue'
 import PlaylistPanel from '@/components/music/PlaylistPanel.vue'
 import MusicPlayer from '@/components/player/index.vue'
 import { useRouter } from 'vue-router'
-import MobileNav from '@/components/common/MobileNav.vue'
+import MobileNav from '@/components/navigation/MobileNav.vue'
 
 const userStore = useUserStore()
 const playerStore = usePlayerStore()

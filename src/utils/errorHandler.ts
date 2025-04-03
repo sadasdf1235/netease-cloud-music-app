@@ -2,7 +2,18 @@
  * 全局错误处理工具
  * @description 提供统一的错误处理机制，包括错误日志、错误提示等
  */
-import { MessageApi } from 'naive-ui';
+import type { MessageApi } from 'naive-ui';
+
+/**
+ * 简单消息接口
+ * 定义一个更简单的消息接口，不依赖于特定UI库
+ */
+export interface SimpleMessageApi {
+  error: (content: string) => void;
+  warning: (content: string) => void;
+  info: (content: string) => void;
+  success: (content: string) => void;
+}
 
 /**
  * 错误类型枚举
@@ -179,7 +190,7 @@ export function handleApiError(error: any): ErrorInfo {
  * @param error 错误信息
  * @param message 消息API
  */
-export function showErrorMessage(error: ErrorInfo, message: MessageApi) {
+export function showErrorMessage(error: ErrorInfo, message: SimpleMessageApi | MessageApi) {
   // 根据错误类型显示不同样式的消息
   switch (error.type) {
     case ErrorType.NETWORK:
@@ -210,8 +221,8 @@ export function showErrorMessage(error: ErrorInfo, message: MessageApi) {
  * @param error 错误对象
  * @param message 消息API
  */
-export function globalErrorHandler(error: any, message: MessageApi) {
+export function globalErrorHandler(error: any, message: SimpleMessageApi | MessageApi) {
   const errorInfo = handleApiError(error);
   showErrorMessage(errorInfo, message);
   return errorInfo;
-} 
+}

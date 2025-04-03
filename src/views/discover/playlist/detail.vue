@@ -152,7 +152,7 @@ import { useMessage } from 'naive-ui'
 import { useUserStore } from '@/stores/user'
 import MusicList from '@/components/music/MusicList.vue'
 import DataFetcher from '@/components/ui/DataFetcher.vue'
-import CommentList from '@/components/common/CommentList.vue'
+import CommentList from '@/components/comment/CommentList.vue'
 import SimilarPlaylists from '@/components/music/SimilarPlaylists.vue'
 import type { Comment } from '@/types/comment'
 import type { Playlist } from '@/types/models/playlist'
@@ -469,7 +469,7 @@ async function handleCommentSubmit(data: { content: string, replyTo: Comment | n
   try {
     submittingComment.value = true
     let result;
-    
+
     // 区分发送评论和回复评论
     if (data.replyTo) {
       // 回复评论
@@ -546,13 +546,13 @@ const fetchPlaylistDetail = async (): Promise<any> => {
 const handleSuccess = (data: any) => {
   playlistInfo.value = data;
   loading.value = false;
-  
+
   // 加载歌曲列表
   loadPlaylistTracks();
-  
+
   // 加载评论
   loadComments();
-  
+
   // 加载相似歌单
   loadSimilarPlaylists();
 };

@@ -39,11 +39,11 @@
           </button>
         </div>
       </div>
-      
+
       <!-- 统计卡片 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div 
-          v-for="(stat, index) in stats" 
+        <div
+          v-for="(stat, index) in stats"
           :key="index"
           class="stat-card bg-gray-50 dark:bg-dark-800 p-4 rounded-lg text-center"
         >
@@ -81,12 +81,12 @@
       <div class="mt-8">
         <h3 class="text-lg font-medium mb-4">听歌时段分布</h3>
         <div class="grid grid-cols-6 gap-2">
-          <div 
-            v-for="(hour, index) in hourDistribution" 
+          <div
+            v-for="(hour, index) in hourDistribution"
             :key="index"
             class="hour-bar relative"
           >
-            <div 
+            <div
               class="absolute bottom-0 w-full bg-primary/20 rounded-t transition-all duration-500"
               :style="{ height: hour.percentage + '%' }"
             ></div>
@@ -111,8 +111,8 @@ import { getUserListenRank } from '@/api/modules/user';
 import type { ListenRankResponse } from '@/types/models/user';
 import * as echarts from 'echarts';
 import { useDataCache } from '@/composables/useDataCache';
-import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
-import ErrorMessage from '@/components/common/ErrorMessage.vue';
+import LoadingSpinner from '@/components/ui/LoadingSpinner.vue';
+import ErrorMessage from '@/components/ui/ErrorMessage.vue';
 import { useRouter } from 'vue-router';
 
 const userStore = useUserStore();
@@ -169,7 +169,7 @@ const { data: cachedData, isLoading, error, loadData } = useDataCache<ListenRank
  */
 function initChart() {
   if (!chartRef.value) return;
-  
+
   chart = echarts.init(chartRef.value);
   updateChart();
 }
@@ -179,9 +179,9 @@ function initChart() {
  */
 function updateChart() {
   if (!chart) return;
-  
+
   const data = trendData.value[currentTimeRange.value];
-  
+
   const option = {
     tooltip: {
       trigger: 'axis',
@@ -224,7 +224,7 @@ function updateChart() {
       }
     ]
   };
-  
+
   chart.setOption(option);
 }
 
@@ -233,14 +233,14 @@ function updateChart() {
  */
 async function loadListeningStats() {
   if (!userStore.isLoggedIn || !userStore.profile?.userId) return;
-  
+
   await loadData(async () => {
     const res = await getUserListenRank(userStore.profile.userId, 1) as ListenRankResponse;
     if (res && 'weekData' in res && res.weekData) {
       // 计算统计数据
       const weekCount = res.weekData.length;
       const weekDuration = weekCount * 3; // 假设每首歌平均3分钟
-      
+
       stats.value = [
         { label: '总听歌时长', value: '0小时' }, // 需要后端提供
         { label: '总听歌数量', value: '0首' }, // 需要后端提供
@@ -307,4 +307,4 @@ onMounted(() => {
 .hour-bar {
   height: 100px;
 }
-</style> 
+</style>
