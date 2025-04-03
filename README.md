@@ -2,6 +2,15 @@
 
 基于 Vue 3 + TypeScript + Vite 开发的网易云音乐 Web 版，使用 Tailwind CSS 构建界面。
 
+## 项目状态
+
+本项目正在持续优化中，已完成的优化包括：
+
+1. **API模块整合**：合并重复的API函数，统一导出方式，增加了缓存机制
+2. **类型系统优化**：整合类型定义，解决类型分散问题，创建统一的模型
+3. **状态管理优化**：改进Pinia存储，添加更多功能和缓存机制
+4. **错误处理优化**：创建统一的错误处理机制，优化用户体验
+
 ## 功能特性
 
 ### 1. 用户中心
@@ -35,34 +44,54 @@
 - 音量控制
 - 播放模式切换
 - 歌词显示
+- 播放历史记录
 
 ## 技术栈
 
-- Vue 3
-- TypeScript
-- Vite
-- Tailwind CSS
-- ECharts
-- Naive UI
+- **前端框架**：Vue 3 + Composition API
+- **语言**：TypeScript
+- **构建工具**：Vite
+- **CSS框架**：Tailwind CSS
+- **状态管理**：Pinia
+- **路由**：Vue Router
+- **UI组件**：Naive UI + Ant Design Vue
+- **图表**：ECharts
+- **HTTP请求**：Axios
 
 ## 项目结构
 
 ```
 src/
-├── api/                # API 接口
-├── assets/            # 静态资源
-├── components/        # 公共组件
-├── composables/       # 组合式函数
-├── layouts/           # 布局组件
-├── router/            # 路由配置
-├── stores/            # 状态管理
-├── styles/            # 全局样式
-├── types/             # TypeScript 类型定义
-└── views/             # 页面组件
-    ├── home/          # 首页
-    ├── playlist/      # 歌单页
-    ├── search/        # 搜索页
-    └── user/          # 用户中心
+├── api/                # API 接口（已优化）
+│   ├── modules/        # 按功能分类的API模块
+│   └── index.ts        # 统一导出API
+├── assets/             # 静态资源
+├── components/         # 公共组件
+│   ├── common/         # 通用组件
+│   ├── layout/         # 布局组件
+│   ├── music/          # 音乐相关组件
+│   ├── player/         # 播放器组件
+│   └── ui/             # UI组件
+├── composables/        # 组合式函数
+├── constants/          # 常量定义
+├── directives/         # 自定义指令
+├── router/             # 路由配置
+├── stores/             # 状态管理（已优化）
+├── styles/             # 全局样式
+├── types/              # TypeScript 类型定义（已优化）
+│   ├── api/            # API响应类型
+│   ├── models/         # 数据模型类型
+│   └── store/          # 状态类型
+├── utils/              # 工具函数（已优化）
+│   ├── apiCache.ts     # API缓存工具
+│   ├── errorHandler.ts # 错误处理工具
+│   └── request.ts      # HTTP请求工具
+└── views/              # 页面组件
+    ├── discover/       # 发现音乐
+    ├── login/          # 登录页
+    ├── my/             # 我的音乐
+    ├── search/         # 搜索页
+    └── user/           # 用户中心
 ```
 
 ## 开发规范
@@ -71,6 +100,7 @@ src/
    - 使用 TypeScript 进行类型检查
    - 组件使用 Composition API
    - 使用 ESLint 和 Prettier 进行代码格式化
+   - 遵循统一的错误处理机制
 
 2. **样式规范**
    - 使用 Tailwind CSS 进行样式开发
@@ -92,18 +122,16 @@ src/
 1. **性能优化**
    - 图片懒加载
    - 组件按需加载
-   - 数据缓存策略
+   - 优化数据加载性能
 
 2. **功能完善**
-   - 完善音乐偏好数据计算
-   - 添加更多数据可视化图表
-   - 优化数据加载性能
-   - 添加数据导出格式选择
+   - 完善歌曲列表交互
+   - 优化播放器UI和体验
+   - 完善用户个人页面
 
 3. **用户体验**
    - 添加加载动画
    - 优化页面过渡效果
-   - 完善错误提示
    - 添加操作引导
 
 ## 本地开发
@@ -125,3 +153,12 @@ pnpm build
 - Firefox >= 78
 - Safari >= 14
 - Edge >= 88
+
+## 项目优化记录
+
+### 2023-04-03 优化
+- API模块整合：合并了music.ts和song.ts，减少重复代码
+- 类型定义优化：整合了分散的类型定义，创建统一的模型
+- 状态管理优化：改进了播放器状态管理，添加了播放历史记录
+- 错误处理统一：优化了错误处理机制，提升用户体验
+- 请求工具增强：优化了HTTP请求工具，添加了统一的错误处理
