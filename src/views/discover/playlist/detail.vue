@@ -1,7 +1,7 @@
 <template>
   <div class="playlist-detail-page">
     <DataFetcher
-      :requestFn="getPlaylistDetail"
+      :requestFn="fetchPlaylistDetail"
       :params="{ id: playlistId }"
       @success="handleSuccess"
       @error="handleError"
@@ -156,6 +156,7 @@ import CommentList from '@/components/common/CommentList.vue'
 import SimilarPlaylists from '@/components/music/SimilarPlaylists.vue'
 import type { Comment } from '@/types/comment'
 import type { Playlist } from '@/types/models/playlist'
+import type { Track } from '@/types/models/track'
 
 const route = useRoute()
 const router = useRouter()
@@ -178,6 +179,8 @@ const loading = ref(true)
 const isCollected = ref(false)
 // 显示完整描述
 const showFullDesc = ref(false)
+// 搜索关键词
+const searchKeyword = ref('')
 
 /**
  * 歌单基本信息
@@ -196,7 +199,7 @@ const playlistInfo = ref({
 })
 
 // 歌曲列表
-const tracks = ref([])
+const tracks = ref<Track[]>([])
 
 // 评论相关数据
 const comments = ref<Comment[]>([])
@@ -219,7 +222,7 @@ const filteredTracks = computed(() => {
   if (!searchKeyword.value) return tracks.value
 
   const keyword = searchKeyword.value.toLowerCase()
-  return tracks.value.filter(track => {
+  return tracks.value.filter((track: Track) => {
     return track.name.toLowerCase().includes(keyword) ||
            formatArtists(track.ar).toLowerCase().includes(keyword) ||
            (track.al?.name && track.al.name.toLowerCase().includes(keyword))
@@ -231,7 +234,7 @@ const filteredTracks = computed(() => {
  * @param timestamp 时间戳
  * @returns 格式化后的日期字符串 (YYYY-MM-DD)
  */
-function formatDate(timestamp) {
+function formatDate(timestamp: number): string {
   if (!timestamp) return ''
   const date = new Date(timestamp)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -242,9 +245,9 @@ function formatDate(timestamp) {
  * @param artists 歌手数组
  * @returns 以斜杠分隔的歌手名称字符串
  */
-function formatArtists(artists) {
+function formatArtists(artists: any[]): string {
   if (!artists || !artists.length) return ''
-  return artists.map(artist => artist.name).join('/')
+  return artists.map((artist: any) => artist.name).join('/')
 }
 
 /**
@@ -252,7 +255,7 @@ function formatArtists(artists) {
  * @param duration 时长(毫秒)
  * @returns 格式化后的时长字符串 (MM:SS)
  */
-function formatDuration(duration) {
+function formatDuration(duration: number): string {
   if (!duration) return '00:00'
   const minutes = Math.floor(duration / 1000 / 60)
   const seconds = Math.floor((duration / 1000) % 60)
@@ -264,7 +267,7 @@ function formatDuration(duration) {
  * @param count 播放次数
  * @returns 格式化后的播放次数
  */
-function formatPlayCount(count) {
+function formatPlayCount(count: number): string {
   if (!count) return '0'
   if (count < 10000) return count.toString()
   if (count < 100000000) return Math.floor(count / 10000) + '万'
@@ -275,14 +278,14 @@ function formatPlayCount(count) {
  * 播放全部歌曲
  * @description 将整个歌单添加到播放列表并开始播放第一首
  */
-function playAll() {
+function playAll(): void {
   if (tracks.value.length === 0) {
     message.warning('歌单中没有歌曲')
     return
   }
 
   // 将歌曲列表转换为播放器需要的格式
-  const songList = tracks.value.map(track => ({
+  const songList = tracks.value.map((track: Track) => ({
     id: track.id,
     name: track.name,
     artists: track.ar,
@@ -530,6 +533,16 @@ function handleMoreSimilarPlaylists() {
   message.info('查看更多相似歌单功能开发中...')
 }
 
+/**
+ * 获取歌单详情的函数，用于DataFetcher组件
+ * @returns 歌单详情数据
+ */
+const fetchPlaylistDetail = async (): Promise<any> => {
+  loading.value = true;
+  const detailRes = await getPlaylistDetail(playlistId.value);
+  return detailRes;
+};
+
 const handleSuccess = (data: any) => {
   playlistInfo.value = data;
   loading.value = false;
@@ -549,12 +562,6 @@ const handleError = (error: Error) => {
   loading.value = false;
 };
 
-const getPlaylistDetail = async () => {
-  loading.value = true;
-  const detailRes = await getPlaylistDetail(playlistId.value);
-  return detailRes;
-};
-
 const loadPlaylistTracks = async () => {
   try {
     const tracksRes = await getPlaylistTracks(playlistId.value);
@@ -569,13 +576,13 @@ const loadPlaylistTracks = async () => {
 // 监听路由参数变化，重新获取数据
 watch(() => route.params.id, (newId) => {
   if (newId) {
-    getPlaylistDetail()
+    fetchPlaylistDetail()
   }
 })
 
 onMounted(() => {
   if (playlistId.value) {
-    getPlaylistDetail()
+    fetchPlaylistDetail()
   } else {
     message.error('歌单ID无效')
     router.push('/discover/playlist')

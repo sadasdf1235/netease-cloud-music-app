@@ -115,3 +115,27 @@ export function getUserFolloweds(uid: number, limit = 30, offset = 0) {
 export function getUserRecord(uid: number, type = 1) {
   return get('/user/record', { uid, type });
 }
+
+/**
+ * 获取用户动态
+ * @param uid 用户id
+ * @param limit 取出数量，默认为20
+ * @param lasttime 传入上一次返回结果的lasttime，用于分页
+ * @returns Promise<any> 用户动态
+ */
+export function getUserEvents(uid: number, limit = 20, lasttime?: number) {
+  const params: any = { uid, limit };
+  if (lasttime) params.lasttime = lasttime;
+  return get('/user/event', params);
+}
+
+/**
+ * 获取用户听歌排行
+ * @param uid 用户id
+ * @param type 类型，1为最近一周，0为所有时间
+ * @param limit 取出数量，默认为100
+ * @returns Promise<any> 用户听歌排行
+ */
+export function getUserListenRank(uid: number, type = 1, limit = 100) {
+  return get('/user/record', { uid, type, limit });
+}

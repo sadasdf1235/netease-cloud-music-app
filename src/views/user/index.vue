@@ -87,11 +87,11 @@
               :key="index"
               class="px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap"
               :class="[
-                activeTab === tab.value 
+                activeTab === tab.key 
                   ? 'text-primary border-b-2 border-primary' 
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               ]"
-              @click="activeTab = tab.value"
+              @click="activeTab = tab.key"
             >
               {{ tab.label }}
             </button>
@@ -159,65 +159,24 @@
             </div>
           </div>
 
-          <!-- 播放历史 -->
-          <div v-else-if="activeTab === 'history'">
-            <div v-if="isLoading" class="text-center py-10">
-              <n-spin size="large" />
-            </div>
-            <div v-else-if="playHistory.length > 0">
-              <h2 class="text-lg font-bold mb-4">最近播放</h2>
-              <MusicList
-                :tracks="playHistory"
-                :loading="isLoading"
-                :show-search="false"
-                :show-count="true"
-                :empty-text="'暂无播放历史'"
-                @play="playSong"
-                @add-to-playlist="addToPlaylist"
-                @toggle-like="toggleLike"
-                @more-actions="showMoreActions"
-              />
-            </div>
-            <div v-else class="py-10 text-center text-gray-500">
-              <div class="i-carbon-recently-viewed text-5xl mx-auto mb-4"></div>
-              <p>暂无播放历史</p>
-              <p class="mt-2 text-sm">去发现一些好听的音乐吧~</p>
-            </div>
+          <!-- 听歌排行 -->
+          <div v-else-if="activeTab === 'rank'">
+            <ListeningRank />
           </div>
 
-          <!-- 我的关注 -->
-          <div v-else-if="activeTab === 'follows'">
-            <div v-if="isLoading" class="text-center py-10">
-              <n-spin size="large" />
-            </div>
-            <div v-else-if="follows.length > 0">
-              <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                <div 
-                  v-for="artist in follows" 
-                  :key="artist.id"
-                  class="artist-card"
-                >
-                  <div class="relative aspect-square overflow-hidden rounded-full mb-2">
-                    <img 
-                      :src="artist.avatarUrl + '?param=200y200'" 
-                      :alt="artist.name"
-                      class="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div class="text-center">
-                    <div class="text-sm font-medium">{{ artist.name }}</div>
-                    <div class="text-xs text-gray-500 mt-1">
-                      {{ formatNumber(artist.followeds || 0) }} 粉丝
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="py-10 text-center text-gray-500">
-              <div class="i-carbon-user-favorite text-5xl mx-auto mb-4"></div>
-              <p>暂无关注的用户/歌手</p>
-              <p class="mt-2 text-sm">去发现页面寻找你喜爱的歌手吧~</p>
-            </div>
+          <!-- 听歌偏好 -->
+          <div v-else-if="activeTab === 'preference'">
+            <MusicPreference />
+          </div>
+
+          <!-- 听歌统计 -->
+          <div v-else-if="activeTab === 'stats'">
+            <ListeningStats />
+          </div>
+
+          <!-- 个人资料 -->
+          <div v-else-if="activeTab === 'profile'">
+            <ProfileEditor />
           </div>
         </div>
       </div>
@@ -232,6 +191,13 @@
         立即登录
       </n-button>
     </div>
+
+    <!-- 操作引导 -->
+    <GuideTooltip
+      v-if="showGuide"
+      :steps="guideSteps"
+      @complete="completeGuide"
+    />
   </div>
 </template>
 
@@ -240,24 +206,21 @@
  * 用户个人中心页面
  * @description 显示用户基本信息、收藏内容、播放历史等
  */
-import { ref, computed, onMounted, defineComponent } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUserStore } from '@/stores/user';
 import { usePlayerStore } from '@/stores/player';
 import { useMessage, NSpin, NButton } from 'naive-ui';
-import { getUserPlaylists, getUserRecord, getUserFollows } from '@/api/modules/user';
+import { getUserPlaylists } from '@/api/modules/user';
 import MusicList from '@/components/music/MusicList.vue';
-import type { UserProfile } from '@/types/models/user';
-
-// 定义组件，解决模板中的类型问题
-defineComponent({
-  name: 'UserCenter',
-  components: {
-    MusicList,
-    NSpin,
-    NButton
-  }
-});
+import ListeningRank from './components/ListeningRank.vue';
+import ListeningPreference from './components/ListeningPreference.vue';
+import ProfileEditor from './components/ProfileEditor.vue';
+import ListeningStats from './components/ListeningStats.vue';
+import MusicPreference from './components/MusicPreference.vue';
+import type { UserProfile, Playlist, UserPlaylistsResponse } from '@/types/models/user';
+import PageTransition from '@/components/common/PageTransition.vue';
+import GuideTooltip from '@/components/common/GuideTooltip.vue';
 
 const userStore = useUserStore();
 const playerStore = usePlayerStore();
@@ -266,13 +229,13 @@ const message = useMessage();
 
 // 页面状态
 const isLoading = ref(false);
-const activeTab = ref('collect'); // collect, history, follows
+const activeTab = ref<'stats' | 'preference' | 'rank'>('stats');
 
 // 标签页定义
 const tabs = [
-  { label: '我的收藏', value: 'collect' },
-  { label: '播放历史', value: 'history' },
-  { label: '我的关注', value: 'follows' }
+  { key: 'stats', label: '听歌统计' },
+  { key: 'preference', label: '音乐偏好' },
+  { key: 'rank', label: '听歌排行' }
 ];
 
 // 收藏统计
@@ -283,23 +246,17 @@ const collectStats = ref({
 });
 
 // 歌单数据
-const playlists = ref<any[]>([]);
+const playlists = ref<Playlist[]>([]);
 const createdPlaylists = computed(() => {
-  return playlists.value.filter((playlist) => 
+  return playlists.value.filter((playlist: Playlist) => 
     playlist.creator && playlist.creator.userId === userStore.profile?.userId
   );
 });
 const collectedPlaylists = computed(() => {
-  return playlists.value.filter((playlist) => 
+  return playlists.value.filter((playlist: Playlist) => 
     playlist.creator && playlist.creator.userId !== userStore.profile?.userId
   );
 });
-
-// 播放历史
-const playHistory = ref<any[]>([]);
-
-// 关注列表
-const follows = ref<any[]>([]);
 
 /**
  * 加载用户歌单
@@ -309,7 +266,7 @@ async function loadUserPlaylists() {
   
   isLoading.value = true;
   try {
-    const res = await getUserPlaylists(userStore.profile.userId);
+    const res = await getUserPlaylists(userStore.profile.userId) as UserPlaylistsResponse;
     if (res.playlist) {
       playlists.value = res.playlist;
       collectStats.value.playlists = createdPlaylists.value.length;
@@ -323,50 +280,7 @@ async function loadUserPlaylists() {
 }
 
 /**
- * 加载播放历史
- */
-async function loadPlayHistory() {
-  if (!userStore.isLoggedIn || !userStore.profile?.userId) return;
-  
-  isLoading.value = true;
-  try {
-    // type=1: 最近一周播放, type=0: 所有时间
-    const res = await getUserRecord(userStore.profile.userId, 1);
-    if (res.weekData) {
-      playHistory.value = res.weekData.map((item: any) => item.song);
-    }
-  } catch (error) {
-    console.error('获取播放历史失败:', error);
-    message.error('获取播放历史失败');
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-/**
- * 加载用户关注列表
- */
-async function loadUserFollows() {
-  if (!userStore.isLoggedIn || !userStore.profile?.userId) return;
-  
-  isLoading.value = true;
-  try {
-    const res = await getUserFollows(userStore.profile.userId);
-    if (res && res.follow) {
-      follows.value = res.follow;
-    }
-  } catch (error) {
-    console.error('获取关注列表失败:', error);
-    message.error('获取关注列表失败');
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-/**
  * 格式化数字，如果大于10000则显示为"xx万"
- * @param num 要格式化的数字
- * @returns 格式化后的字符串
  */
 function formatNumber(num: number): string {
   if (num >= 10000) {
@@ -375,46 +289,57 @@ function formatNumber(num: number): string {
   return num.toString();
 }
 
-/**
- * 播放歌曲
- */
-function playSong({ track, index }: { track: any, index: number }) {
-  playerStore.setPlaylist([track]);
-  playerStore.play(0);
-  message.success(`正在播放: ${track.name}`);
+// 引导步骤
+const guideSteps = [
+  {
+    title: '听歌统计',
+    content: '这里展示了你的听歌时长、数量等统计信息，帮助你了解自己的听歌习惯。',
+    position: {
+      top: '30%',
+      left: '50%'
+    }
+  },
+  {
+    title: '音乐偏好',
+    content: '这里展示了你的音乐风格偏好、常听歌手和语言偏好，帮助你发现自己的音乐品味。',
+    position: {
+      top: '30%',
+      left: '50%'
+    }
+  },
+  {
+    title: '听歌排行',
+    content: '这里展示了你最近一周/一月的听歌排行，帮助你回顾最近喜欢的音乐。',
+    position: {
+      top: '30%',
+      left: '50%'
+    }
+  }
+];
+
+// 是否显示引导
+const showGuide = ref(true);
+
+// 完成引导
+function completeGuide() {
+  showGuide.value = false;
+  // 可以在这里保存用户完成引导的状态
+  localStorage.setItem('user_guide_completed', 'true');
 }
 
-/**
- * 添加到播放列表
- */
-function addToPlaylist(track: any) {
-  playerStore.addToPlaylist(track);
-  message.success('已添加到播放列表');
-}
-
-/**
- * 收藏歌曲
- */
-function toggleLike(track: any) {
-  message.success(`收藏成功: ${track.name}`);
-}
-
-/**
- * 显示更多操作
- */
-function showMoreActions(track: any) {
-  message.info('更多功能开发中');
-}
+// 检查是否需要显示引导
+onMounted(() => {
+  const completed = localStorage.getItem('user_guide_completed');
+  if (completed === 'true') {
+    showGuide.value = false;
+  }
+});
 
 // 页面初始化
 onMounted(async () => {
   // 如果已登录，则加载用户数据
   if (userStore.isLoggedIn) {
-    await Promise.all([
-      loadUserPlaylists(),
-      loadPlayHistory(),
-      loadUserFollows()
-    ]);
+    await loadUserPlaylists();
   }
 });
 </script>
@@ -426,5 +351,13 @@ onMounted(async () => {
 .hide-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.playlist-card {
+  transition: all 0.3s ease;
+}
+
+.playlist-card:hover {
+  transform: translateY(-4px);
 }
 </style> 
