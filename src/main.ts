@@ -15,7 +15,8 @@ import router from './router'
 //===================================================
 // 样式导入
 //===================================================
-// 移除所有UnoCSS相关导入，包括@unocss/reset/tailwind.css
+import '@unocss/reset/tailwind.css'
+import 'uno.css'
 import './style.css'
 import './styles/global.less'
 
