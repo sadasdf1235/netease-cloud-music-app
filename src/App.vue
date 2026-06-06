@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import { NConfigProvider, NMessageProvider } from 'naive-ui';
 
 const route = useRoute();
 
@@ -14,11 +15,15 @@ const cachedViews = computed(() => {
 </script>
 
 <template>
-  <router-view v-slot="{ Component }">
-    <keep-alive :include="cachedViews">
-      <component :is="Component" />
-    </keep-alive>
-  </router-view>
+  <NConfigProvider>
+    <NMessageProvider>
+      <router-view v-slot="{ Component }">
+        <keep-alive :include="cachedViews">
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
+    </NMessageProvider>
+  </NConfigProvider>
 </template>
 
 <style>

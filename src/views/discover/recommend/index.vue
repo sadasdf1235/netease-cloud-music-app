@@ -230,14 +230,11 @@ import { useMessage } from "naive-ui";
 import {
   getBanners,
   getRecommendPlaylists,
-  getNewSongs,
-  getNewAlbums,
-  getHotArtists,
-  getPlaylistDetail,
-  getPlaylistTracks,
-  getArtistHotSongs
+  getNewSongs
 } from "@/api/modules/music-song";
-import { getAlbumDetail } from "@/api/modules/album";
+import { getNewAlbums, getAlbumDetail } from "@/api/modules/album";
+import { getTopArtists, getArtistHotSongs } from "@/api/modules/artist";
+import { getPlaylistDetail, getPlaylistTracks } from "@/api/modules/playlist";
 import type {
   Banner,
   RecommendPlaylistItem,
@@ -355,52 +352,32 @@ async function fetchData() {
     // 获取轮播图
     bannersLoading.value = true;
     const bannersRes = await getBanners();
-    banners.value = bannersRes.banners;
+    banners.value = bannersRes.banners || [];
     bannersLoading.value = false;
 
     // 获取推荐歌单
     playlistsLoading.value = true;
     const playlistsRes = await getRecommendPlaylists(10);
-    recommendPlaylists.value = playlistsRes.result;
+    recommendPlaylists.value = playlistsRes.result || [];
     playlistsLoading.value = false;
 
     // 获取新歌
     newSongsLoading.value = true;
-    console.log("开始获取新歌数据");
     const newSongsRes = await getNewSongs();
-    console.log("获取到新歌数据:", newSongsRes);
-
-    if (newSongsRes.data && newSongsRes.data.length > 0) {
-      newSongs.value = newSongsRes.data;
-      console.log("设置新歌数据, 数量:", newSongs.value.length);
-      console.log("第一首新歌:", newSongs.value[0]);
-
-      // 测试播放第一首新歌
-      if (newSongs.value.length > 0 && !playerStore.currentSong) {
-        console.log("尝试添加第一首新歌到播放列表");
-        const firstSong = newSongs.value[0];
-        // 确保歌曲数据完整
-        if (firstSong && firstSong.id) {
-          playerStore.setPlaylist([firstSong]);
-          console.log("已添加第一首新歌到播放列表");
-        }
-      }
-    } else {
-      console.error("新歌数据为空或格式不正确");
-    }
+    const songsData = newSongsRes.data || newSongsRes.result || [];
+    newSongs.value = Array.isArray(songsData) ? songsData : [];
     newSongsLoading.value = false;
 
     // 获取新碟
     newAlbumsLoading.value = true;
     const newAlbumsRes = await getNewAlbums(10);
-    console.log("获取到新碟数据:", newAlbumsRes);
-    newAlbums.value = newAlbumsRes.albums;
+    newAlbums.value = newAlbumsRes.albums || [];
     newAlbumsLoading.value = false;
 
     // 获取热门歌手
     artistsLoading.value = true;
-    const artistsRes = await getHotArtists(6);
-    hotArtists.value = artistsRes.artists;
+    const artistsRes = await getTopArtists(6);
+    hotArtists.value = artistsRes.artists || [];
     artistsLoading.value = false;
   } catch (error) {
     console.error("获取推荐页数据失败:", error);

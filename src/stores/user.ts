@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { UserProfile } from '@/types/user'
-import { login, logout, getUserProfile } from '@/api/user'
+import { loginByPhone, logout, getUserAccount } from '@/api/modules/user'
 import { STORAGE_KEY } from '@/constants/storage'
 
 export const useUserStore = defineStore('user', () => {
@@ -13,7 +13,7 @@ export const useUserStore = defineStore('user', () => {
   // 登录
   const loginAction = async (phone: string, password: string) => {
     try {
-      const res = await login(phone, password)
+      const res = await loginByPhone(phone, password)
       token.value = res.token
       localStorage.setItem(STORAGE_KEY.TOKEN, res.token)
       await getProfile()
@@ -42,7 +42,7 @@ export const useUserStore = defineStore('user', () => {
   const getProfile = async () => {
     try {
       if (!token.value) return null
-      const data = await getUserProfile()
+      const data = await getUserAccount()
       profile.value = data
       return data
     } catch (error) {
