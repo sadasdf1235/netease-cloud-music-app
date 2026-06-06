@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 type ViewKey = 'discover' | 'charts' | 'library'
 type MoodKey = '全部' | '通勤' | '夜晚' | '专注' | '派对'
@@ -47,6 +47,13 @@ interface Chart {
 interface LyricLine {
   time: number
   text: string
+}
+
+interface StoredPlayerState {
+  currentTrackId?: number
+  likedIds?: number[]
+  queueIds?: number[]
+  volume?: number
 }
 
 const navItems: Array<{ key: ViewKey; label: string; icon: string }> = [
@@ -249,17 +256,103 @@ const lyricLines: LyricLine[] = [
   { time: 68, text: '下一首歌，刚好接住此刻的你' },
 ]
 
+const playerStorageKey = 'netease-cloud-music-app:player-state'
+const defaultLikedIds = [101, 103, 104]
+const defaultQueue = [...playlists[0].tracks]
+const trackMap = new Map(tracks.map((track) => [track.id, track]))
+
+/**
+ * 判断本地存储是否可用。
+ * @returns 当前运行环境是否能访问 localStorage
+ */
+function canUseStorage() {
+  return typeof window !== 'undefined' && Boolean(window.localStorage)
+}
+
+/**
+ * 从本地存储读取播放器状态。
+ * @returns 解析后的播放器状态
+ */
+function readStoredPlayerState(): StoredPlayerState {
+  if (!canUseStorage()) return {}
+
+  try {
+    const rawState = window.localStorage.getItem(playerStorageKey)
+    if (!rawState) return {}
+    return JSON.parse(rawState) as StoredPlayerState
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 将歌曲 id 列表还原为有效歌曲列表。
+ * @param ids 待还原的歌曲 id 列表
+ * @returns 去重后的歌曲列表
+ */
+function restoreTracksByIds(ids?: number[]) {
+  if (!ids?.length) return []
+
+  const uniqueIds = [...new Set(ids)]
+  return uniqueIds
+    .map((id) => trackMap.get(id))
+    .filter((track): track is Track => Boolean(track))
+}
+
+/**
+ * 从缓存状态恢复播放队列。
+ * @param state 缓存状态
+ * @returns 可用的播放队列
+ */
+function restoreQueue(state: StoredPlayerState) {
+  const storedQueue = restoreTracksByIds(state.queueIds)
+  return storedQueue.length ? storedQueue : defaultQueue
+}
+
+/**
+ * 从缓存状态恢复当前歌曲。
+ * @param state 缓存状态
+ * @param restoredQueue 已恢复的播放队列
+ * @returns 当前播放歌曲
+ */
+function restoreCurrentTrack(state: StoredPlayerState, restoredQueue: Track[]) {
+  const storedTrack = state.currentTrackId ? trackMap.get(state.currentTrackId) : undefined
+  return storedTrack || restoredQueue[0] || tracks[0]
+}
+
+/**
+ * 从缓存状态恢复收藏歌曲。
+ * @param state 缓存状态
+ * @returns 收藏歌曲 id 集合
+ */
+function restoreLikedIds(state: StoredPlayerState) {
+  const storedLikedIds = restoreTracksByIds(state.likedIds).map((track) => track.id)
+  return storedLikedIds.length ? storedLikedIds : defaultLikedIds
+}
+
+/**
+ * 从缓存状态恢复音量。
+ * @param state 缓存状态
+ * @returns 0 到 100 之间的音量
+ */
+function restoreVolume(state: StoredPlayerState) {
+  if (typeof state.volume !== 'number') return 78
+  return Math.min(100, Math.max(0, state.volume))
+}
+
+const storedPlayerState = readStoredPlayerState()
+const initialQueue = restoreQueue(storedPlayerState)
 const audioRef = ref<HTMLAudioElement | null>(null)
 const activeView = ref<ViewKey>('discover')
 const activeMood = ref<MoodKey>('全部')
 const searchKeyword = ref('')
 const isPlaying = ref(false)
 const currentTime = ref(0)
-const duration = ref(tracks[0].duration)
-const volume = ref(78)
-const queue = ref<Track[]>([...playlists[0].tracks])
-const currentTrack = ref<Track>(playlists[0].tracks[0])
-const likedIds = ref<Set<number>>(new Set([101, 103, 104]))
+const currentTrack = ref<Track>(restoreCurrentTrack(storedPlayerState, initialQueue))
+const duration = ref(currentTrack.value.duration)
+const volume = ref(restoreVolume(storedPlayerState))
+const queue = ref<Track[]>(initialQueue)
+const likedIds = ref<Set<number>>(new Set(restoreLikedIds(storedPlayerState)))
 const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
 const toastMessage = ref('')
@@ -300,6 +393,32 @@ const activeLyric = computed(() => {
   return lyricLines.reduce((current, line) => {
     return currentTime.value >= line.time ? line : current
   }, lyricLines[0])
+})
+
+/**
+ * 保存播放器和个人音乐状态。
+ */
+function savePlayerState() {
+  if (!canUseStorage()) return
+
+  const state: StoredPlayerState = {
+    currentTrackId: currentTrack.value.id,
+    likedIds: [...likedIds.value],
+    queueIds: queue.value.map((track) => track.id),
+    volume: volume.value,
+  }
+
+  window.localStorage.setItem(playerStorageKey, JSON.stringify(state))
+}
+
+watch([currentTrack, queue, likedIds, volume], savePlayerState, { deep: true })
+
+onMounted(() => {
+  duration.value = currentTrack.value.duration
+  if (audioRef.value) {
+    audioRef.value.volume = volume.value / 100
+  }
+  savePlayerState()
 })
 
 /**
@@ -360,7 +479,7 @@ function showToast(message: string) {
  */
 async function playTrack(track: Track, source = tracks) {
   currentTrack.value = track
-  queue.value = source
+  queue.value = [...source]
   duration.value = track.duration
   currentTime.value = 0
   isPlaying.value = true
