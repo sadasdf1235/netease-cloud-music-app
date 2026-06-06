@@ -1072,8 +1072,10 @@ function selectSuggestion(track: Track) {
                   <button type="button" @click="playTrack(track, chart.tracks)">
                     <span>{{ index + 1 }}</span>
                     <img :src="track.cover" :alt="track.album" />
-                    <strong>{{ track.title }}</strong>
-                    <small>{{ track.artist }}</small>
+                    <span class="chart-track-meta">
+                      <strong>{{ track.title }}</strong>
+                      <small>{{ track.artist }}</small>
+                    </span>
                     <time>{{ formatTime(track.duration) }}</time>
                   </button>
                 </li>
@@ -1702,8 +1704,7 @@ function selectSuggestion(track: Track) {
 
 .track-meta,
 .playlist-card > div,
-.chart-card button strong,
-.chart-card button small,
+.chart-track-meta,
 .player-track > div {
   min-width: 0;
 }
@@ -1712,8 +1713,8 @@ function selectSuggestion(track: Track) {
 .track-meta small,
 .playlist-card h3,
 .playlist-card p,
-.chart-card button strong,
-.chart-card button small,
+.chart-track-meta strong,
+.chart-track-meta small,
 .player-track strong,
 .player-track small {
   overflow: hidden;
@@ -1983,7 +1984,7 @@ function selectSuggestion(track: Track) {
 .chart-card button {
   width: 100%;
   display: grid;
-  grid-template-columns: 24px 42px minmax(0, 1fr) minmax(42px, auto);
+  grid-template-columns: 24px 42px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 10px;
   padding: 8px;
@@ -1991,6 +1992,11 @@ function selectSuggestion(track: Track) {
   background: transparent;
   color: inherit;
   text-align: left;
+}
+
+.chart-track-meta {
+  display: grid;
+  gap: 3px;
 }
 
 .chart-card button:hover {
