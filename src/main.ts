@@ -7,7 +7,6 @@
 // 核心库导入
 //===================================================
 import { createApp } from 'vue'
-import { createRouter, createWebHistory } from 'vue-router'
 import { createPinia } from 'pinia'
 import type { App as AppType, ComponentPublicInstance, ErrorHandler } from 'vue'
 import App from './App.vue'
@@ -16,8 +15,7 @@ import router from './router'
 //===================================================
 // 样式导入
 //===================================================
-import '@unocss/reset/tailwind.css'
-import 'uno.css'
+// 移除所有UnoCSS相关导入，包括@unocss/reset/tailwind.css
 import './style.css'
 import './styles/global.less'
 

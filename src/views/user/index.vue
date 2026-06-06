@@ -87,8 +87,8 @@
               :key="index"
               class="px-6 py-4 text-sm font-medium transition-colors whitespace-nowrap"
               :class="[
-                activeTab === tab.key 
-                  ? 'text-primary border-b-2 border-primary' 
+                activeTab === tab.key
+                  ? 'text-primary border-b-2 border-primary'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               ]"
               @click="activeTab = tab.key"
@@ -107,14 +107,14 @@
             <div v-else-if="collectedPlaylists.length > 0">
               <h2 class="text-lg font-bold mb-4">我创建的歌单</h2>
               <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
-                <div 
-                  v-for="playlist in createdPlaylists" 
+                <div
+                  v-for="playlist in createdPlaylists"
                   :key="playlist.id"
                   class="playlist-card"
                 >
                   <div class="relative aspect-square overflow-hidden rounded-lg mb-2">
-                    <img 
-                      :src="playlist.coverImgUrl + '?param=200y200'" 
+                    <img
+                      :src="playlist.coverImgUrl + '?param=200y200'"
                       :alt="playlist.name"
                       class="w-full h-full object-cover transition-transform hover:scale-110"
                     />
@@ -129,14 +129,14 @@
 
               <h2 class="text-lg font-bold mb-4">我收藏的歌单</h2>
               <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                <div 
-                  v-for="playlist in collectedPlaylists" 
+                <div
+                  v-for="playlist in collectedPlaylists"
                   :key="playlist.id"
                   class="playlist-card"
                 >
                   <div class="relative aspect-square overflow-hidden rounded-lg mb-2">
-                    <img 
-                      :src="playlist.coverImgUrl + '?param=200y200'" 
+                    <img
+                      :src="playlist.coverImgUrl + '?param=200y200'"
                       :alt="playlist.name"
                       class="w-full h-full object-cover transition-transform hover:scale-110"
                     />
@@ -219,8 +219,8 @@ import ProfileEditor from './components/ProfileEditor.vue';
 import ListeningStats from './components/ListeningStats.vue';
 import MusicPreference from './components/MusicPreference.vue';
 import type { UserProfile, Playlist, UserPlaylistsResponse } from '@/types/models/user';
-import PageTransition from '@/components/common/PageTransition.vue';
-import GuideTooltip from '@/components/common/GuideTooltip.vue';
+import PageTransition from '@/components/ui/PageTransition.vue';
+import GuideTooltip from '@/components/ui/GuideTooltip.vue';
 
 const userStore = useUserStore();
 const playerStore = usePlayerStore();
@@ -248,12 +248,12 @@ const collectStats = ref({
 // 歌单数据
 const playlists = ref<Playlist[]>([]);
 const createdPlaylists = computed(() => {
-  return playlists.value.filter((playlist: Playlist) => 
+  return playlists.value.filter((playlist: Playlist) =>
     playlist.creator && playlist.creator.userId === userStore.profile?.userId
   );
 });
 const collectedPlaylists = computed(() => {
-  return playlists.value.filter((playlist: Playlist) => 
+  return playlists.value.filter((playlist: Playlist) =>
     playlist.creator && playlist.creator.userId !== userStore.profile?.userId
   );
 });
@@ -263,7 +263,7 @@ const collectedPlaylists = computed(() => {
  */
 async function loadUserPlaylists() {
   if (!userStore.isLoggedIn || !userStore.profile?.userId) return;
-  
+
   isLoading.value = true;
   try {
     const res = await getUserPlaylists(userStore.profile.userId) as UserPlaylistsResponse;
@@ -360,4 +360,4 @@ onMounted(async () => {
 .playlist-card:hover {
   transform: translateY(-4px);
 }
-</style> 
+</style>

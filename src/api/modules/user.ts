@@ -139,3 +139,21 @@ export function getUserEvents(uid: number, limit = 20, lasttime?: number) {
 export function getUserListenRank(uid: number, type = 1, limit = 100) {
   return get('/user/record', { uid, type, limit });
 }
+
+/**
+ * 获取用户喜欢的音乐ID列表
+ * @param uid 用户id
+ * @returns Promise<any> 用户喜欢的音乐ID列表
+ */
+export function getUserLikelist(uid: number) {
+  return get('/likelist', { uid });
+}
+
+/**
+ * 获取用户最近播放记录
+ * @param limit 取出数量，默认为30
+ * @returns Promise<any> 用户最近播放记录
+ */
+export function getUserRecentlyPlayed(limit = 30) {
+  return get('/record/recent/song', { limit });
+}
