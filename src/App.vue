@@ -51,10 +51,12 @@ interface LyricLine {
 }
 
 interface StoredPlayerState {
+  currentTime?: number
   currentTrackId?: number
   likedIds?: number[]
   playMode?: PlayMode
   queueIds?: number[]
+  recentTrackIds?: number[]
   volume?: number
 }
 
@@ -260,6 +262,7 @@ const lyricLines: LyricLine[] = [
 
 const playerStorageKey = 'netease-cloud-music-app:player-state'
 const defaultLikedIds = [101, 103, 104]
+const defaultRecentIds = [103, 102, 105, 104]
 const defaultQueue = [...playlists[0].tracks]
 const trackMap = new Map(tracks.map((track) => [track.id, track]))
 
@@ -323,6 +326,19 @@ function restoreCurrentTrack(state: StoredPlayerState, restoredQueue: Track[]) {
 }
 
 /**
+ * 从缓存状态恢复当前播放进度。
+ * @param state 缓存状态
+ * @param fallbackTrack 当前播放歌曲
+ * @returns 可用的播放秒数
+ */
+function restoreCurrentTime(state: StoredPlayerState, fallbackTrack: Track) {
+  if (state.currentTrackId !== fallbackTrack.id || typeof state.currentTime !== 'number') return 0
+
+  const safeTime = Math.max(0, Math.floor(state.currentTime))
+  return Math.min(safeTime, Math.max(0, fallbackTrack.duration - 8))
+}
+
+/**
  * 从缓存状态恢复收藏歌曲。
  * @param state 缓存状态
  * @returns 收藏歌曲 id 集合
@@ -332,6 +348,19 @@ function restoreLikedIds(state: StoredPlayerState) {
 
   const storedLikedIds = restoreTracksByIds(state.likedIds).map((track) => track.id)
   return storedLikedIds
+}
+
+/**
+ * 从缓存状态恢复最近播放歌曲。
+ * @param state 缓存状态
+ * @param fallbackTrack 当前播放歌曲
+ * @returns 最近播放歌曲 id 列表
+ */
+function restoreRecentTrackIds(state: StoredPlayerState, fallbackTrack: Track) {
+  const storedRecentIds = restoreTracksByIds(state.recentTrackIds).map((track) => track.id)
+  if (storedRecentIds.length) return storedRecentIds
+
+  return [fallbackTrack.id, ...defaultRecentIds.filter((id) => id !== fallbackTrack.id)].slice(0, 6)
 }
 
 /**
@@ -356,6 +385,9 @@ function restorePlayMode(state: StoredPlayerState): PlayMode {
 
 const storedPlayerState = readStoredPlayerState()
 const initialQueue = restoreQueue(storedPlayerState)
+const initialCurrentTrack = restoreCurrentTrack(storedPlayerState, initialQueue)
+const initialCurrentTime = restoreCurrentTime(storedPlayerState, initialCurrentTrack)
+const initialRecentTrackIds = restoreRecentTrackIds(storedPlayerState, initialCurrentTrack)
 const audioRef = ref<HTMLAudioElement | null>(null)
 const activeView = ref<ViewKey>('discover')
 const activeMood = ref<MoodKey>('全部')
@@ -363,12 +395,13 @@ const searchKeyword = ref('')
 const isSearchFocused = ref(false)
 let searchBlurTimer: number | undefined
 const isPlaying = ref(false)
-const currentTime = ref(0)
-const currentTrack = ref<Track>(restoreCurrentTrack(storedPlayerState, initialQueue))
+const currentTime = ref(initialCurrentTime)
+const currentTrack = ref<Track>(initialCurrentTrack)
 const duration = ref(currentTrack.value.duration)
 const volume = ref(restoreVolume(storedPlayerState))
 const queue = ref<Track[]>(initialQueue)
 const likedIds = ref<Set<number>>(new Set(restoreLikedIds(storedPlayerState)))
+const recentTrackIds = ref<number[]>(initialRecentTrackIds)
 const playMode = ref<PlayMode>(restorePlayMode(storedPlayerState))
 const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
@@ -403,6 +436,20 @@ const queueIndex = computed(() => queue.value.findIndex((track) => track.id === 
 
 const likedTracks = computed(() => tracks.filter((track) => likedIds.value.has(track.id)))
 
+const recentTracks = computed(() => restoreTracksByIds(recentTrackIds.value))
+
+const favoriteArtists = computed(() => {
+  const artistCounts = likedTracks.value.reduce<Record<string, number>>((counts, track) => {
+    counts[track.artist] = (counts[track.artist] || 0) + 1
+    return counts
+  }, {})
+
+  return Object.entries(artistCounts)
+    .sort(([, currentCount], [, nextCount]) => nextCount - currentCount)
+    .slice(0, 3)
+    .map(([name, count]) => ({ name, count }))
+})
+
 const hasEmptySearchResult = computed(() => {
   return searchKeyword.value.trim().length > 0 && filteredTracks.value.length === 0
 })
@@ -419,6 +466,19 @@ const trackPanelSummary = computed(() => {
   const keyword = searchKeyword.value.trim()
   if (keyword) return `${filteredTracks.value.length} 首匹配「${keyword}」`
   return `${filteredTracks.value.length} 首匹配`
+})
+
+const continueProgress = computed(() => {
+  if (!duration.value) return 0
+  return Math.min(100, Math.round((currentTime.value / duration.value) * 100))
+})
+
+const continueProgressLabel = computed(() => {
+  if (currentTime.value > 0) {
+    return `已听 ${formatTime(currentTime.value)} / ${formatTime(duration.value)}`
+  }
+
+  return `${formatTime(duration.value)} 时长 · 当前队列 ${queue.value.length} 首`
 })
 
 const heroStyle = computed(() => {
@@ -452,17 +512,19 @@ function savePlayerState() {
   if (!canUseStorage()) return
 
   const state: StoredPlayerState = {
+    currentTime: Math.floor(currentTime.value),
     currentTrackId: currentTrack.value.id,
     likedIds: [...likedIds.value],
     playMode: playMode.value,
     queueIds: queue.value.map((track) => track.id),
+    recentTrackIds: recentTrackIds.value,
     volume: volume.value,
   }
 
   window.localStorage.setItem(playerStorageKey, JSON.stringify(state))
 }
 
-watch([currentTrack, queue, likedIds, playMode, volume], savePlayerState, { deep: true })
+watch([currentTrack, currentTime, queue, likedIds, playMode, recentTrackIds, volume], savePlayerState, { deep: true })
 
 onMounted(() => {
   duration.value = currentTrack.value.duration
@@ -605,6 +667,40 @@ function showToast(message: string) {
 }
 
 /**
+ * 记录最近播放歌曲。
+ * @param track 播放过的歌曲
+ */
+function rememberRecentTrack(track: Track) {
+  recentTrackIds.value = [track.id, ...recentTrackIds.value.filter((id) => id !== track.id)].slice(0, 6)
+}
+
+/**
+ * 继续播放当前歌曲。
+ */
+async function continuePlayback() {
+  isPlaying.value = true
+  await nextTick()
+
+  if (!audioRef.value) return
+  if (currentTime.value > 0) audioRef.value.currentTime = currentTime.value
+
+  await audioRef.value.play().catch(() => {
+    isPlaying.value = false
+    showToast('继续播放失败，请再次点击播放')
+  })
+}
+
+/**
+ * 计算偏好艺人占比。
+ * @param count 艺人在收藏中的歌曲数量
+ * @returns CSS 宽度百分比
+ */
+function getFavoriteArtistShare(count: number) {
+  if (!likedTracks.value.length) return '0%'
+  return `${Math.max(16, Math.round((count / likedTracks.value.length) * 100))}%`
+}
+
+/**
  * 播放指定歌曲。
  * @param track 目标歌曲
  * @param source 播放来源列表
@@ -615,6 +711,7 @@ async function playTrack(track: Track, source = tracks) {
   duration.value = track.duration
   currentTime.value = 0
   isPlaying.value = true
+  rememberRecentTrack(track)
 
   await nextTick()
   await audioRef.value?.play().catch(() => {
@@ -704,7 +801,12 @@ function togglePlayMode() {
  * 处理音频元数据加载。
  */
 function handleLoadedMetadata() {
-  duration.value = audioRef.value?.duration || currentTrack.value.duration
+  const loadedDuration = audioRef.value?.duration || currentTrack.value.duration
+  duration.value = loadedDuration
+
+  if (audioRef.value && currentTime.value > 0 && currentTime.value < loadedDuration) {
+    audioRef.value.currentTime = currentTime.value
+  }
 }
 
 /**
@@ -1089,11 +1191,53 @@ function selectSuggestion(track: Track) {
             <div>
               <span class="section-kicker">Library</span>
               <h2>你的音乐库</h2>
-              <p>集中管理收藏、播放队列和保存歌单，适合长期反复使用。</p>
+              <p>继续上次的播放进度，回看最近听过的声音，沉淀属于你的音乐偏好。</p>
             </div>
             <button type="button" class="primary-button" @click="isQueueOpen = true">
               打开播放队列
             </button>
+          </section>
+
+          <section class="library-dashboard" aria-label="音乐库概览">
+            <article class="continue-card">
+              <img :src="currentTrack.cover" :alt="currentTrack.album" />
+              <div>
+                <span class="section-kicker">Continue</span>
+                <h3>{{ currentTrack.title }}</h3>
+                <p>{{ currentTrack.artist }} · {{ currentTrack.album }}</p>
+                <div class="continue-progress" aria-label="当前播放进度">
+                  <span :style="{ width: `${continueProgress}%` }"></span>
+                </div>
+                <small>{{ continueProgressLabel }}</small>
+                <div class="continue-actions">
+                  <button type="button" class="primary-button" @click="continuePlayback">
+                    <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                    继续播放
+                  </button>
+                  <button type="button" class="ghost-button" @click="isQueueOpen = true">
+                    <span class="i-carbon-list" aria-hidden="true"></span>
+                    查看队列
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            <aside class="taste-panel">
+              <div>
+                <span class="section-kicker">Taste</span>
+                <h3>收藏偏好</h3>
+              </div>
+              <div v-if="favoriteArtists.length" class="taste-list">
+                <div v-for="artist in favoriteArtists" :key="artist.name" class="taste-item">
+                  <span>
+                    <strong>{{ artist.name }}</strong>
+                    <small>{{ artist.count }} 首收藏</small>
+                  </span>
+                  <i :style="{ width: getFavoriteArtistShare(artist.count) }"></i>
+                </div>
+              </div>
+              <p v-else>收藏歌曲后，这里会形成你的常听轮廓。</p>
+            </aside>
           </section>
 
           <div class="library-grid">
@@ -1113,6 +1257,28 @@ function selectSuggestion(track: Track) {
               <p>保存歌单</p>
             </article>
           </div>
+
+          <section class="recent-section">
+            <div class="panel-heading">
+              <h3>最近播放</h3>
+              <small>{{ recentTracks.length }} 首记录</small>
+            </div>
+            <div class="recent-grid">
+              <button
+                v-for="track in recentTracks"
+                :key="track.id"
+                type="button"
+                class="recent-card"
+                @click="playTrack(track, recentTracks)"
+              >
+                <img :src="track.cover" :alt="track.album" />
+                <span>
+                  <strong>{{ track.title }}</strong>
+                  <small>{{ track.artist }} · {{ formatTime(track.duration) }}</small>
+                </span>
+              </button>
+            </div>
+          </section>
 
           <section class="track-panel">
             <div class="panel-heading">
@@ -1346,6 +1512,7 @@ function selectSuggestion(track: Track) {
 .mood-tabs button,
 .playlist-card button,
 .chart-card button,
+.recent-card,
 .queue-play,
 .queue-remove {
   border: 0;
@@ -1643,7 +1810,10 @@ function selectSuggestion(track: Track) {
 .playlist-card,
 .chart-card,
 .library-hero,
-.library-card {
+.library-card,
+.continue-card,
+.taste-panel,
+.recent-section {
   border: 1px solid rgb(34 28 23 / 10%);
   border-radius: 8px;
   background: rgb(255 255 255 / 84%);
@@ -1705,6 +1875,8 @@ function selectSuggestion(track: Track) {
 .track-meta,
 .playlist-card > div,
 .chart-track-meta,
+.continue-card > div,
+.recent-card span,
 .player-track > div {
   min-width: 0;
 }
@@ -1715,6 +1887,10 @@ function selectSuggestion(track: Track) {
 .playlist-card p,
 .chart-track-meta strong,
 .chart-track-meta small,
+.continue-card h3,
+.continue-card p,
+.recent-card strong,
+.recent-card small,
 .player-track strong,
 .player-track small {
   overflow: hidden;
@@ -2033,6 +2209,97 @@ function selectSuggestion(track: Track) {
   color: #6f665c;
 }
 
+.library-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.55fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.continue-card {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+}
+
+.continue-card > img {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.continue-card h3,
+.taste-panel h3 {
+  margin: 0;
+}
+
+.continue-card p,
+.taste-panel p {
+  color: #6f665c;
+}
+
+.continue-progress {
+  height: 8px;
+  margin: 18px 0 8px;
+  border-radius: 99px;
+  background: #d9dee8;
+  overflow: hidden;
+}
+
+.continue-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #b3261e, #d99224);
+}
+
+.continue-card small {
+  color: #746a5d;
+}
+
+.continue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.taste-panel,
+.recent-section {
+  padding: 16px;
+}
+
+.taste-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.taste-item {
+  display: grid;
+  gap: 8px;
+}
+
+.taste-item span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.taste-item small {
+  color: #756c62;
+  white-space: nowrap;
+}
+
+.taste-item i {
+  height: 7px;
+  border-radius: 99px;
+  background: #b3261e;
+}
+
 .library-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
@@ -2055,6 +2322,51 @@ function selectSuggestion(track: Track) {
 .library-card p {
   margin: 0;
   color: #6f665c;
+}
+
+.recent-section {
+  display: grid;
+  gap: 8px;
+}
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.recent-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f6f8fb;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.recent-card:hover {
+  background: #eef4f1;
+}
+
+.recent-card img {
+  width: 54px;
+  height: 54px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.recent-card strong,
+.recent-card small {
+  display: block;
+}
+
+.recent-card small {
+  color: #756c62;
 }
 
 .queue-backdrop {
@@ -2296,6 +2608,8 @@ input[type='range'] {
   .main-grid,
   .chart-grid,
   .playlist-grid,
+  .library-dashboard,
+  .recent-grid,
   .artist-list {
     grid-template-columns: 1fr 1fr;
   }
@@ -2369,9 +2683,19 @@ input[type='range'] {
   .main-grid,
   .playlist-grid,
   .chart-grid,
+  .library-dashboard,
   .library-grid,
+  .recent-grid,
   .artist-list {
     grid-template-columns: 1fr;
+  }
+
+  .continue-card {
+    grid-template-columns: 1fr;
+  }
+
+  .continue-card > img {
+    max-height: 260px;
   }
 
   .track-row {
