@@ -45,6 +45,24 @@ interface Chart {
   tracks: Track[]
 }
 
+interface SearchArtistResult {
+  name: string
+  avatar: string
+  role: string
+  listeners: string
+  tracks: Track[]
+}
+
+interface SearchAlbumResult {
+  key: string
+  title: string
+  artist: string
+  cover: string
+  tracks: Track[]
+  totalDuration: number
+  totalPlays: number
+}
+
 interface LyricLine {
   time: number
   text: string
@@ -267,6 +285,72 @@ const defaultQueue = [...playlists[0].tracks]
 const trackMap = new Map(tracks.map((track) => [track.id, track]))
 
 /**
+ * 判断歌曲字段是否命中搜索关键词。
+ * @param track 待匹配歌曲
+ * @param keyword 小写搜索关键词
+ * @returns 是否命中标题、艺人或专辑
+ */
+function matchesSearchKeyword(track: Track, keyword: string) {
+  return [track.title, track.artist, track.album].some((field) => field.toLowerCase().includes(keyword))
+}
+
+/**
+ * 按艺人聚合搜索命中的歌曲。
+ * @param matchedTracks 搜索命中的歌曲列表
+ * @returns 艺人维度的搜索结果
+ */
+function createSearchArtistResults(matchedTracks: Track[]): SearchArtistResult[] {
+  const artistGroups = matchedTracks.reduce<Map<string, Track[]>>((groups, track) => {
+    groups.set(track.artist, [...(groups.get(track.artist) || []), track])
+    return groups
+  }, new Map())
+
+  return [...artistGroups.entries()]
+    .map(([name, artistTracks]) => {
+      const fallbackTrack = artistTracks[0]
+      const artist = artists.find((item) => item.name === name)
+
+      return {
+        name,
+        avatar: artist?.avatar || fallbackTrack.cover,
+        role: artist?.role || '独立音乐人',
+        listeners: artist?.listeners || `${formatPlayCount(fallbackTrack.plays)} 次播放`,
+        tracks: artistTracks,
+      }
+    })
+    .sort((current, next) => next.tracks.length - current.tracks.length || next.tracks[0].plays - current.tracks[0].plays)
+}
+
+/**
+ * 按专辑聚合搜索命中的歌曲。
+ * @param matchedTracks 搜索命中的歌曲列表
+ * @returns 专辑维度的搜索结果
+ */
+function createSearchAlbumResults(matchedTracks: Track[]): SearchAlbumResult[] {
+  const albumGroups = matchedTracks.reduce<Map<string, Track[]>>((groups, track) => {
+    const key = `${track.artist}::${track.album}`
+    groups.set(key, [...(groups.get(key) || []), track])
+    return groups
+  }, new Map())
+
+  return [...albumGroups.entries()]
+    .map(([key, albumTracks]) => {
+      const coverTrack = albumTracks[0]
+
+      return {
+        key,
+        title: coverTrack.album,
+        artist: coverTrack.artist,
+        cover: coverTrack.cover,
+        tracks: albumTracks,
+        totalDuration: albumTracks.reduce((total, track) => total + track.duration, 0),
+        totalPlays: albumTracks.reduce((total, track) => total + track.plays, 0),
+      }
+    })
+    .sort((current, next) => next.totalPlays - current.totalPlays)
+}
+
+/**
  * 判断本地存储是否可用。
  * @returns 当前运行环境是否能访问 localStorage
  */
@@ -407,13 +491,15 @@ const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
 const toastMessage = ref('')
 
-const filteredTracks = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
+const normalizedSearchKeyword = computed(() => searchKeyword.value.trim())
 
-  if (keyword) {
-    return tracks.filter((track) => {
-      return [track.title, track.artist, track.album].some((field) => field.toLowerCase().includes(keyword))
-    })
+const normalizedSearchTerm = computed(() => normalizedSearchKeyword.value.toLowerCase())
+
+const isSearching = computed(() => normalizedSearchKeyword.value.length > 0)
+
+const filteredTracks = computed(() => {
+  if (normalizedSearchTerm.value) {
+    return tracks.filter((track) => matchesSearchKeyword(track, normalizedSearchTerm.value))
   }
 
   const moodTracks = activeMood.value === '全部'
@@ -424,12 +510,28 @@ const filteredTracks = computed(() => {
 })
 
 const searchSuggestions = computed(() => {
-  const keyword = searchKeyword.value.trim().toLowerCase()
+  const keyword = normalizedSearchTerm.value
   if (!keyword) return []
 
   return tracks
-    .filter((track) => `${track.title} ${track.artist} ${track.album}`.toLowerCase().includes(keyword))
+    .filter((track) => matchesSearchKeyword(track, keyword))
     .slice(0, 4)
+})
+
+const searchResultArtists = computed(() => {
+  if (!isSearching.value) return []
+  return createSearchArtistResults(filteredTracks.value)
+})
+
+const searchResultAlbums = computed(() => {
+  if (!isSearching.value) return []
+  return createSearchAlbumResults(filteredTracks.value)
+})
+
+const searchResultSummary = computed(() => {
+  if (!isSearching.value) return ''
+  if (!filteredTracks.value.length) return `暂无与「${normalizedSearchKeyword.value}」相关的内容`
+  return `${filteredTracks.value.length} 首歌曲 · ${searchResultArtists.value.length} 位艺人 · ${searchResultAlbums.value.length} 张专辑`
 })
 
 const queueIndex = computed(() => queue.value.findIndex((track) => track.id === currentTrack.value.id))
@@ -451,7 +553,7 @@ const favoriteArtists = computed(() => {
 })
 
 const hasEmptySearchResult = computed(() => {
-  return searchKeyword.value.trim().length > 0 && filteredTracks.value.length === 0
+  return isSearching.value && filteredTracks.value.length === 0
 })
 
 const hasVisibleSearchSuggestions = computed(() => {
@@ -459,11 +561,11 @@ const hasVisibleSearchSuggestions = computed(() => {
 })
 
 const trackPanelTitle = computed(() => {
-  return searchKeyword.value.trim() ? '全站搜索结果' : '今日推荐歌曲'
+  return isSearching.value ? '歌曲结果' : '今日推荐歌曲'
 })
 
 const trackPanelSummary = computed(() => {
-  const keyword = searchKeyword.value.trim()
+  const keyword = normalizedSearchKeyword.value
   if (keyword) return `${filteredTracks.value.length} 首匹配「${keyword}」`
   return `${filteredTracks.value.length} 首匹配`
 })
@@ -935,6 +1037,28 @@ function selectSuggestion(track: Track) {
   isQueueOpen.value = false
   closeSearchSuggestions()
 }
+
+/**
+ * 使用艺人名继续搜索。
+ * @param artistName 艺人名
+ */
+function selectSearchArtist(artistName: string) {
+  searchKeyword.value = artistName
+  activeMood.value = '全部'
+  activeView.value = 'discover'
+  closeSearchSuggestions()
+}
+
+/**
+ * 播放搜索结果中的专辑。
+ * @param album 搜索专辑结果
+ */
+function playSearchAlbum(album: SearchAlbumResult) {
+  const [firstTrack] = album.tracks
+  if (!firstTrack) return
+  void playTrack(firstTrack, album.tracks)
+  showToast(`开始播放《${album.title}》`)
+}
 </script>
 
 <template>
@@ -1047,6 +1171,82 @@ function selectSuggestion(track: Track) {
               >
                 {{ mood }}
               </button>
+            </div>
+          </section>
+
+          <section v-if="isSearching" class="search-results-overview" aria-label="搜索结果概览">
+            <div class="search-result-hero">
+              <span class="section-kicker">Search</span>
+              <h2>{{ normalizedSearchKeyword }}</h2>
+              <p>{{ searchResultSummary }}</p>
+            </div>
+
+            <div v-if="filteredTracks.length" class="search-groups">
+              <section class="search-group">
+                <div class="search-group-head">
+                  <span class="i-carbon-music" aria-hidden="true"></span>
+                  <strong>歌曲</strong>
+                  <small>{{ filteredTracks.length }} 首</small>
+                </div>
+                <button
+                  v-for="track in filteredTracks.slice(0, 2)"
+                  :key="track.id"
+                  type="button"
+                  class="search-mini-track"
+                  @click="playTrack(track, filteredTracks)"
+                >
+                  <img :src="track.cover" :alt="track.album" />
+                  <span>
+                    <strong>{{ track.title }}</strong>
+                    <small>{{ track.artist }}</small>
+                  </span>
+                  <i class="i-carbon-play-filled" aria-hidden="true"></i>
+                </button>
+              </section>
+
+              <section class="search-group">
+                <div class="search-group-head">
+                  <span class="i-carbon-user-avatar" aria-hidden="true"></span>
+                  <strong>艺人</strong>
+                  <small>{{ searchResultArtists.length }} 位</small>
+                </div>
+                <button
+                  v-for="artist in searchResultArtists.slice(0, 2)"
+                  :key="artist.name"
+                  type="button"
+                  class="search-artist-card"
+                  @click="selectSearchArtist(artist.name)"
+                >
+                  <img :src="artist.avatar" :alt="artist.name" />
+                  <span>
+                    <strong>{{ artist.name }}</strong>
+                    <small>{{ artist.role }}</small>
+                  </span>
+                  <em>{{ artist.tracks.length }} 首</em>
+                </button>
+              </section>
+
+              <section class="search-group">
+                <div class="search-group-head">
+                  <span class="i-carbon-recording" aria-hidden="true"></span>
+                  <strong>专辑</strong>
+                  <small>{{ searchResultAlbums.length }} 张</small>
+                </div>
+                <button
+                  v-for="album in searchResultAlbums.slice(0, 2)"
+                  :key="album.key"
+                  type="button"
+                  class="search-album-card"
+                  @click="playSearchAlbum(album)"
+                >
+                  <img :src="album.cover" :alt="album.title" />
+                  <span>
+                    <strong>{{ album.title }}</strong>
+                    <small>{{ album.artist }} · {{ formatTime(album.totalDuration) }}</small>
+                  </span>
+                  <i class="i-carbon-play-filled" aria-hidden="true"></i>
+                </button>
+              </section>
             </div>
           </section>
 
@@ -1513,6 +1713,9 @@ function selectSuggestion(track: Track) {
 .playlist-card button,
 .chart-card button,
 .recent-card,
+.search-mini-track,
+.search-artist-card,
+.search-album-card,
 .queue-play,
 .queue-remove {
   border: 0;
@@ -1796,6 +1999,171 @@ function selectSuggestion(track: Track) {
 .mood-tabs button.active {
   background: #121620;
   color: #fff;
+}
+
+.search-results-overview {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.34fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.search-result-hero {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 20px;
+  border-radius: 8px;
+  background: #121620;
+  color: #fff;
+  overflow: hidden;
+}
+
+.search-result-hero .section-kicker {
+  color: #ffcf66;
+}
+
+.search-result-hero h2 {
+  max-width: 100%;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(30px, 5vw, 54px);
+  line-height: 0.98;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.search-result-hero p {
+  margin: 0;
+  color: rgb(255 255 255 / 68%);
+}
+
+.search-groups {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.search-group {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgb(34 28 23 / 10%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 84%);
+  box-shadow: 0 16px 48px rgb(31 23 17 / 8%);
+}
+
+.search-group-head {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-group-head > span {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef4f1;
+  color: #b3261e;
+}
+
+.search-group-head strong,
+.search-group-head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-group-head small {
+  color: #756c62;
+}
+
+.search-mini-track,
+.search-artist-card,
+.search-album-card {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f6f8fb;
+  color: inherit;
+  text-align: left;
+}
+
+.search-mini-track:hover,
+.search-artist-card:hover,
+.search-album-card:hover {
+  background: #eef4f1;
+}
+
+.search-mini-track img,
+.search-artist-card img,
+.search-album-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.search-artist-card img {
+  border-radius: 50%;
+}
+
+.search-mini-track span,
+.search-artist-card span,
+.search-album-card span {
+  min-width: 0;
+}
+
+.search-mini-track strong,
+.search-mini-track small,
+.search-artist-card strong,
+.search-artist-card small,
+.search-album-card strong,
+.search-album-card small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-mini-track small,
+.search-artist-card small,
+.search-album-card small {
+  color: #756c62;
+}
+
+.search-mini-track i,
+.search-album-card i {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #121620;
+  color: #fff;
+}
+
+.search-artist-card em {
+  color: #b3261e;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
 }
 
 .main-grid {
@@ -2614,6 +2982,10 @@ input[type='range'] {
     grid-template-columns: 1fr 1fr;
   }
 
+  .search-results-overview {
+    grid-template-columns: 1fr;
+  }
+
   .now-card {
     grid-column: 1 / -1;
   }
@@ -2686,8 +3058,27 @@ input[type='range'] {
   .library-dashboard,
   .library-grid,
   .recent-grid,
-  .artist-list {
+  .artist-list,
+  .search-groups {
     grid-template-columns: 1fr;
+  }
+
+  .search-result-hero {
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .search-mini-track,
+  .search-artist-card,
+  .search-album-card {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+  }
+
+  .search-mini-track img,
+  .search-artist-card img,
+  .search-album-card img {
+    width: 44px;
+    height: 44px;
   }
 
   .continue-card {
