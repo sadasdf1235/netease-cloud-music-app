@@ -360,6 +360,7 @@ const audioRef = ref<HTMLAudioElement | null>(null)
 const activeView = ref<ViewKey>('discover')
 const activeMood = ref<MoodKey>('全部')
 const searchKeyword = ref('')
+const isSearchFocused = ref(false)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const currentTrack = ref<Track>(restoreCurrentTrack(storedPlayerState, initialQueue))
@@ -400,6 +401,10 @@ const likedTracks = computed(() => tracks.filter((track) => likedIds.value.has(t
 
 const hasEmptySearchResult = computed(() => {
   return searchKeyword.value.trim().length > 0 && filteredTracks.value.length === 0
+})
+
+const hasVisibleSearchSuggestions = computed(() => {
+  return isSearchFocused.value && searchSuggestions.value.length > 0
 })
 
 const heroStyle = computed(() => {
@@ -476,6 +481,16 @@ function selectMood(mood: MoodKey) {
 function clearSearch() {
   searchKeyword.value = ''
   activeMood.value = '全部'
+  isSearchFocused.value = false
+}
+
+/**
+ * 延迟关闭搜索建议，保证点击建议项能先完成。
+ */
+function blurSearch() {
+  window.setTimeout(() => {
+    isSearchFocused.value = false
+  }, 120)
 }
 
 /**
@@ -682,6 +697,20 @@ function addToQueue(track: Track) {
 }
 
 /**
+ * 打开或关闭播放队列。
+ */
+function toggleQueuePanel() {
+  isQueueOpen.value = !isQueueOpen.value
+}
+
+/**
+ * 关闭播放队列。
+ */
+function closeQueuePanel() {
+  isQueueOpen.value = false
+}
+
+/**
  * 从播放队列移除歌曲。
  * @param track 目标歌曲
  */
@@ -723,6 +752,7 @@ function resetQueue() {
 function selectSuggestion(track: Track) {
   searchKeyword.value = track.title
   activeMood.value = '全部'
+  isSearchFocused.value = false
 }
 </script>
 
@@ -769,8 +799,10 @@ function selectSuggestion(track: Track) {
             type="search"
             placeholder="搜索歌曲、专辑、歌手"
             aria-label="搜索音乐"
+            @blur="blurSearch"
+            @focus="isSearchFocused = true"
           />
-          <div v-if="searchSuggestions.length" class="suggestions">
+          <div v-if="hasVisibleSearchSuggestions" class="suggestions">
             <button
               v-for="track in searchSuggestions"
               :key="track.id"
@@ -785,7 +817,7 @@ function selectSuggestion(track: Track) {
         </div>
 
         <div class="top-actions">
-          <button type="button" class="ghost-button" @click="isQueueOpen = !isQueueOpen">
+          <button type="button" class="ghost-button" @click="toggleQueuePanel">
             <span class="i-carbon-list" aria-hidden="true"></span>
             队列 {{ queue.length }}
           </button>
@@ -846,7 +878,12 @@ function selectSuggestion(track: Track) {
                 :class="['track-row', { playing: currentTrack.id === track.id }]"
               >
                 <span class="track-index">{{ String(index + 1).padStart(2, '0') }}</span>
-                <button type="button" class="cover-button" @click="playTrack(track, filteredTracks)">
+                <button
+                  type="button"
+                  class="cover-button"
+                  :aria-label="`播放 ${track.title}`"
+                  @click="playTrack(track, filteredTracks)"
+                >
                   <img :src="track.cover" :alt="track.album" />
                   <span class="i-carbon-play-filled" aria-hidden="true"></span>
                 </button>
@@ -997,8 +1034,13 @@ function selectSuggestion(track: Track) {
               <h3>收藏歌曲</h3>
               <small>可直接播放或加入队列</small>
             </div>
-            <article v-for="track in likedTracks" :key="track.id" class="track-row">
-              <button type="button" class="cover-button" @click="playTrack(track, likedTracks)">
+            <article v-for="track in likedTracks" :key="track.id" class="track-row library-track-row">
+              <button
+                type="button"
+                class="cover-button"
+                :aria-label="`播放 ${track.title}`"
+                @click="playTrack(track, likedTracks)"
+              >
                 <img :src="track.cover" :alt="track.album" />
                 <span class="i-carbon-play-filled" aria-hidden="true"></span>
               </button>
@@ -1006,7 +1048,7 @@ function selectSuggestion(track: Track) {
                 <strong>{{ track.title }}</strong>
                 <small>{{ track.artist }} · {{ track.album }}</small>
               </div>
-              <button type="button" class="icon-button" @click="addToQueue(track)">
+              <button type="button" class="icon-button" aria-label="添加到队列" @click="addToQueue(track)">
                 <span class="i-carbon-add-alt" aria-hidden="true"></span>
               </button>
               <time>{{ formatTime(track.duration) }}</time>
@@ -1025,13 +1067,21 @@ function selectSuggestion(track: Track) {
       </main>
     </div>
 
+    <button
+      v-if="isQueueOpen"
+      type="button"
+      class="queue-backdrop"
+      aria-label="关闭播放队列"
+      @click="closeQueuePanel"
+    ></button>
+
     <aside :class="['queue-panel', { open: isQueueOpen }]" aria-label="播放队列">
       <div class="queue-head">
         <div>
           <span class="section-kicker">Queue</span>
           <h2>播放队列</h2>
         </div>
-        <button type="button" class="icon-button" @click="isQueueOpen = false" aria-label="关闭队列">
+        <button type="button" class="icon-button" @click="closeQueuePanel" aria-label="关闭队列">
           <span class="i-carbon-close" aria-hidden="true"></span>
         </button>
       </div>
@@ -1531,6 +1581,10 @@ function selectSuggestion(track: Track) {
   border-radius: 8px;
 }
 
+.library-track-row {
+  grid-template-columns: 52px minmax(160px, 1fr) 38px 50px;
+}
+
 .track-row:hover,
 .track-row.playing {
   background: #eef4f1;
@@ -1853,6 +1907,15 @@ function selectSuggestion(track: Track) {
   color: #6f665c;
 }
 
+.queue-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  border: 0;
+  background: rgb(18 22 30 / 26%);
+  cursor: pointer;
+}
+
 .queue-panel {
   position: fixed;
   top: 0;
@@ -2133,7 +2196,9 @@ input[type='range'] {
   }
 
   .top-actions {
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    overflow-x: visible;
   }
 
   .content {
@@ -2155,6 +2220,10 @@ input[type='range'] {
 
   .track-row {
     grid-template-columns: 48px minmax(0, 1fr) 38px 44px;
+  }
+
+  .library-track-row {
+    grid-template-columns: 48px minmax(0, 1fr) 38px;
   }
 
   .track-index,
