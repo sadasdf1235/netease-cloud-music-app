@@ -3,6 +3,7 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 type ViewKey = 'discover' | 'charts' | 'library'
 type MoodKey = '全部' | '通勤' | '夜晚' | '专注' | '派对'
+type PlayMode = 'sequence' | 'repeat' | 'shuffle'
 
 interface Artist {
   id: number
@@ -52,6 +53,7 @@ interface LyricLine {
 interface StoredPlayerState {
   currentTrackId?: number
   likedIds?: number[]
+  playMode?: PlayMode
   queueIds?: number[]
   volume?: number
 }
@@ -326,8 +328,10 @@ function restoreCurrentTrack(state: StoredPlayerState, restoredQueue: Track[]) {
  * @returns 收藏歌曲 id 集合
  */
 function restoreLikedIds(state: StoredPlayerState) {
+  if (!state.likedIds) return [...defaultLikedIds]
+
   const storedLikedIds = restoreTracksByIds(state.likedIds).map((track) => track.id)
-  return storedLikedIds.length ? storedLikedIds : defaultLikedIds
+  return storedLikedIds
 }
 
 /**
@@ -338,6 +342,16 @@ function restoreLikedIds(state: StoredPlayerState) {
 function restoreVolume(state: StoredPlayerState) {
   if (typeof state.volume !== 'number') return 78
   return Math.min(100, Math.max(0, state.volume))
+}
+
+/**
+ * 从缓存状态恢复播放模式。
+ * @param state 缓存状态
+ * @returns 可用的播放模式
+ */
+function restorePlayMode(state: StoredPlayerState): PlayMode {
+  if (state.playMode === 'repeat' || state.playMode === 'shuffle') return state.playMode
+  return 'sequence'
 }
 
 const storedPlayerState = readStoredPlayerState()
@@ -353,6 +367,7 @@ const duration = ref(currentTrack.value.duration)
 const volume = ref(restoreVolume(storedPlayerState))
 const queue = ref<Track[]>(initialQueue)
 const likedIds = ref<Set<number>>(new Set(restoreLikedIds(storedPlayerState)))
+const playMode = ref<PlayMode>(restorePlayMode(storedPlayerState))
 const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
 const toastMessage = ref('')
@@ -383,6 +398,10 @@ const queueIndex = computed(() => queue.value.findIndex((track) => track.id === 
 
 const likedTracks = computed(() => tracks.filter((track) => likedIds.value.has(track.id)))
 
+const hasEmptySearchResult = computed(() => {
+  return searchKeyword.value.trim().length > 0 && filteredTracks.value.length === 0
+})
+
 const heroStyle = computed(() => {
   return {
     backgroundImage: `linear-gradient(90deg, rgb(21 16 12 / 92%) 0%, rgb(21 16 12 / 64%) 46%, rgb(21 16 12 / 8%) 100%), url(${currentTrack.value.cover})`,
@@ -395,6 +414,18 @@ const activeLyric = computed(() => {
   }, lyricLines[0])
 })
 
+const playModeMeta = computed(() => {
+  if (playMode.value === 'repeat') {
+    return { icon: 'i-carbon-repeat-one', label: '单曲循环' }
+  }
+
+  if (playMode.value === 'shuffle') {
+    return { icon: 'i-carbon-shuffle', label: '随机播放' }
+  }
+
+  return { icon: 'i-carbon-repeat', label: '顺序播放' }
+})
+
 /**
  * 保存播放器和个人音乐状态。
  */
@@ -404,6 +435,7 @@ function savePlayerState() {
   const state: StoredPlayerState = {
     currentTrackId: currentTrack.value.id,
     likedIds: [...likedIds.value],
+    playMode: playMode.value,
     queueIds: queue.value.map((track) => track.id),
     volume: volume.value,
   }
@@ -411,7 +443,7 @@ function savePlayerState() {
   window.localStorage.setItem(playerStorageKey, JSON.stringify(state))
 }
 
-watch([currentTrack, queue, likedIds, volume], savePlayerState, { deep: true })
+watch([currentTrack, queue, likedIds, playMode, volume], savePlayerState, { deep: true })
 
 onMounted(() => {
   duration.value = currentTrack.value.duration
@@ -436,6 +468,14 @@ function setView(view: ViewKey) {
  */
 function selectMood(mood: MoodKey) {
   activeMood.value = mood
+}
+
+/**
+ * 清空搜索和心情筛选。
+ */
+function clearSearch() {
+  searchKeyword.value = ''
+  activeMood.value = '全部'
 }
 
 /**
@@ -525,6 +565,21 @@ async function togglePlayback() {
  * 播放队列中的下一首。
  */
 function playNextTrack() {
+  if (playMode.value === 'repeat') {
+    void playTrack(currentTrack.value, queue.value)
+    return
+  }
+
+  if (playMode.value === 'shuffle' && queue.value.length > 1) {
+    let randomIndex = queueIndex.value
+    while (randomIndex === queueIndex.value) {
+      randomIndex = Math.floor(Math.random() * queue.value.length)
+    }
+    const randomTrack = queue.value[randomIndex]
+    if (randomTrack) void playTrack(randomTrack, queue.value)
+    return
+  }
+
   const nextIndex = queueIndex.value >= 0 ? (queueIndex.value + 1) % queue.value.length : 0
   const nextTrack = queue.value[nextIndex]
   if (nextTrack) void playTrack(nextTrack, queue.value)
@@ -537,6 +592,20 @@ function playPreviousTrack() {
   const previousIndex = queueIndex.value > 0 ? queueIndex.value - 1 : queue.value.length - 1
   const previousTrack = queue.value[previousIndex]
   if (previousTrack) void playTrack(previousTrack, queue.value)
+}
+
+/**
+ * 切换播放模式。
+ */
+function togglePlayMode() {
+  const nextMode: Record<PlayMode, PlayMode> = {
+    sequence: 'repeat',
+    repeat: 'shuffle',
+    shuffle: 'sequence',
+  }
+
+  playMode.value = nextMode[playMode.value]
+  showToast(`已切换为${playModeMeta.value.label}`)
 }
 
 /**
@@ -610,6 +679,41 @@ function addToQueue(track: Track) {
 
   queue.value = [...queue.value, track]
   showToast('已添加到播放队列')
+}
+
+/**
+ * 从播放队列移除歌曲。
+ * @param track 目标歌曲
+ */
+function removeFromQueue(track: Track) {
+  if (queue.value.length <= 1) {
+    showToast('播放队列至少保留一首歌')
+    return
+  }
+
+  const nextQueue = queue.value.filter((item) => item.id !== track.id)
+  queue.value = nextQueue
+
+  if (currentTrack.value.id === track.id) {
+    const [nextTrack] = nextQueue
+    if (nextTrack) void playTrack(nextTrack, nextQueue)
+  }
+
+  showToast('已从播放队列移除')
+}
+
+/**
+ * 重置播放队列为每日推荐。
+ */
+function resetQueue() {
+  queue.value = [...defaultQueue]
+  const [firstTrack] = queue.value
+  if (firstTrack) {
+    currentTrack.value = firstTrack
+    duration.value = firstTrack.duration
+    currentTime.value = 0
+  }
+  showToast('播放队列已重置')
 }
 
 /**
@@ -760,6 +864,15 @@ function selectSuggestion(track: Track) {
                 </button>
                 <time>{{ formatTime(track.duration) }}</time>
               </article>
+
+              <div v-if="hasEmptySearchResult" class="empty-state">
+                <span class="i-carbon-search" aria-hidden="true"></span>
+                <strong>没有找到匹配歌曲</strong>
+                <p>换一个关键词，或者回到全部心情继续发现音乐。</p>
+                <button type="button" class="ghost-button" @click="clearSearch">
+                  清空筛选
+                </button>
+              </div>
             </div>
 
             <aside class="now-card">
@@ -898,6 +1011,15 @@ function selectSuggestion(track: Track) {
               </button>
               <time>{{ formatTime(track.duration) }}</time>
             </article>
+
+            <div v-if="!likedTracks.length" class="empty-state">
+              <span class="i-carbon-favorite" aria-hidden="true"></span>
+              <strong>还没有收藏歌曲</strong>
+              <p>在发现页点亮喜欢，音乐库会自动保存你的常听清单。</p>
+              <button type="button" class="ghost-button" @click="setView('discover')">
+                去发现音乐
+              </button>
+            </div>
           </section>
         </section>
       </main>
@@ -913,20 +1035,32 @@ function selectSuggestion(track: Track) {
           <span class="i-carbon-close" aria-hidden="true"></span>
         </button>
       </div>
-      <button
+
+      <div class="queue-actions">
+        <button type="button" class="ghost-button" @click="resetQueue">
+          <span class="i-carbon-restart" aria-hidden="true"></span>
+          重置每日推荐
+        </button>
+        <small>{{ queue.length }} 首歌曲</small>
+      </div>
+
+      <article
         v-for="track in queue"
         :key="track.id"
         :class="['queue-item', { active: currentTrack.id === track.id }]"
-        type="button"
-        @click="playTrack(track, queue)"
       >
-        <img :src="track.cover" :alt="track.album" />
-        <span>
-          <strong>{{ track.title }}</strong>
-          <small>{{ track.artist }}</small>
-        </span>
+        <button type="button" class="queue-play" @click="playTrack(track, queue)" :aria-label="`播放 ${track.title}`">
+          <img :src="track.cover" :alt="track.album" />
+          <span>
+            <strong>{{ track.title }}</strong>
+            <small>{{ track.artist }}</small>
+          </span>
+        </button>
         <time>{{ formatTime(track.duration) }}</time>
-      </button>
+        <button type="button" class="queue-remove" @click="removeFromQueue(track)" :aria-label="`从队列移除 ${track.title}`">
+          <span class="i-carbon-close" aria-hidden="true"></span>
+        </button>
+      </article>
     </aside>
 
     <footer class="player-bar">
@@ -975,6 +1109,15 @@ function selectSuggestion(track: Track) {
       </div>
 
       <div class="player-tools">
+        <button
+          type="button"
+          class="icon-button mode-button"
+          :title="playModeMeta.label"
+          :aria-label="playModeMeta.label"
+          @click="togglePlayMode"
+        >
+          <span :class="playModeMeta.icon" aria-hidden="true"></span>
+        </button>
         <button type="button" class="icon-button" @click="toggleLike(currentTrack)" aria-label="收藏当前歌曲">
           <span :class="isLiked(currentTrack) ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" aria-hidden="true"></span>
         </button>
@@ -1068,7 +1211,8 @@ function selectSuggestion(track: Track) {
 .mood-tabs button,
 .playlist-card button,
 .chart-card button,
-.queue-item {
+.queue-play,
+.queue-remove {
   border: 0;
   font: inherit;
   cursor: pointer;
@@ -1453,6 +1597,44 @@ function selectSuggestion(track: Track) {
   color: #b3261e;
 }
 
+.mode-button {
+  color: #ffcf66;
+}
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin: 10px 8px 4px;
+  padding: 34px 20px;
+  border: 1px dashed rgb(34 28 23 / 16%);
+  border-radius: 8px;
+  background: rgb(246 248 251 / 72%);
+  color: #5f574f;
+  text-align: center;
+}
+
+.empty-state > span {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #eef4f1;
+  color: #b3261e;
+  font-size: 24px;
+}
+
+.empty-state strong {
+  color: #1b1715;
+  font-size: 18px;
+}
+
+.empty-state p {
+  max-width: 320px;
+  margin: 0;
+}
+
 .now-card {
   padding: 16px;
 }
@@ -1682,6 +1864,7 @@ function selectSuggestion(track: Track) {
   background: #fff;
   border-left: 1px solid rgb(34 28 23 / 10%);
   box-shadow: -24px 0 80px rgb(31 23 17 / 18%);
+  overflow-y: auto;
   transform: translateX(105%);
   transition: transform 0.24s ease;
 }
@@ -1690,21 +1873,46 @@ function selectSuggestion(track: Track) {
   transform: translateX(0);
 }
 
+.queue-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 0 8px 14px;
+  border-bottom: 1px solid rgb(34 28 23 / 8%);
+}
+
+.queue-actions small {
+  color: #746a5d;
+  white-space: nowrap;
+}
+
 .queue-item {
   width: 100%;
   display: grid;
-  grid-template-columns: 46px 1fr 48px;
+  grid-template-columns: minmax(0, 1fr) 48px 36px;
   align-items: center;
   gap: 10px;
   padding: 9px;
   border-radius: 8px;
-  background: transparent;
-  text-align: left;
 }
 
 .queue-item.active,
 .queue-item:hover {
   background: #edf3f6;
+}
+
+.queue-play {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
 .queue-item small {
@@ -1732,6 +1940,21 @@ function selectSuggestion(track: Track) {
 .queue-item time {
   color: #766d62;
   font-size: 13px;
+}
+
+.queue-remove {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: transparent;
+  color: #8b8176;
+}
+
+.queue-remove:hover {
+  background: rgb(179 38 30 / 10%);
+  color: #b3261e;
 }
 
 .player-bar {
