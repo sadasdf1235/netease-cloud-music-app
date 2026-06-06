@@ -1268,6 +1268,16 @@ function selectSuggestion(track: Track) {
   cursor: pointer;
 }
 
+/* 固定 Carbon 图标盒模型，避免图标加载前后挤压文字排版。 */
+.music-app :where([class^='i-carbon-'], [class*=' i-carbon-']) {
+  width: 1em;
+  height: 1em;
+  display: inline-block;
+  flex: 0 0 auto;
+  line-height: 1;
+  vertical-align: -0.125em;
+}
+
 .nav-item {
   display: flex;
   align-items: center;
@@ -1400,6 +1410,13 @@ function selectSuggestion(track: Track) {
   background: #eef4f1;
 }
 
+.suggestions span,
+.suggestions small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .suggestions img {
   width: 40px;
   height: 40px;
@@ -1419,6 +1436,7 @@ function selectSuggestion(track: Track) {
 .ghost-button,
 .primary-button {
   min-height: 40px;
+  min-width: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1577,6 +1595,7 @@ function selectSuggestion(track: Track) {
   grid-template-columns: 32px 52px minmax(150px, 1fr) 84px 72px 38px 38px 50px;
   align-items: center;
   gap: 10px;
+  min-height: 72px;
   padding: 10px 8px;
   border-radius: 8px;
 }
@@ -1595,6 +1614,28 @@ function selectSuggestion(track: Track) {
 .track-row time {
   color: #7c7266;
   font-size: 13px;
+  white-space: nowrap;
+}
+
+.track-meta,
+.playlist-card > div,
+.chart-card button strong,
+.chart-card button small,
+.player-track > div {
+  min-width: 0;
+}
+
+.track-meta strong,
+.track-meta small,
+.playlist-card h3,
+.playlist-card p,
+.chart-card button strong,
+.chart-card button small,
+.player-track strong,
+.player-track small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cover-button {
@@ -1607,6 +1648,15 @@ function selectSuggestion(track: Track) {
   background: #121620;
 }
 
+.cover-button::before {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 35%);
+  content: '';
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
 .cover-button img,
 .player-track img,
 .queue-item img {
@@ -1617,14 +1667,18 @@ function selectSuggestion(track: Track) {
 
 .cover-button span {
   position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
   color: #fff;
-  background: rgb(0 0 0 / 35%);
+  font-size: 22px;
   opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.18s ease;
 }
 
+.cover-button:hover::before,
+.track-row.playing .cover-button::before,
 .cover-button:hover span,
 .track-row.playing .cover-button span {
   opacity: 1;
@@ -1744,6 +1798,7 @@ function selectSuggestion(track: Track) {
   display: grid;
   grid-template-columns: 136px 1fr;
   gap: 16px;
+  min-width: 0;
   padding: 14px;
 }
 
@@ -1766,6 +1821,7 @@ function selectSuggestion(track: Track) {
 .playlist-card button {
   display: inline-flex;
   align-items: center;
+  max-width: 100%;
   gap: 6px;
   margin-top: 10px;
   padding: 8px 11px;
@@ -1844,7 +1900,7 @@ function selectSuggestion(track: Track) {
 .chart-card button {
   width: 100%;
   display: grid;
-  grid-template-columns: 24px 42px minmax(0, 1fr) auto;
+  grid-template-columns: 24px 42px minmax(0, 1fr) minmax(42px, auto);
   align-items: center;
   gap: 10px;
   padding: 8px;
@@ -1868,6 +1924,11 @@ function selectSuggestion(track: Track) {
 .chart-card small {
   display: block;
   color: #756c62;
+}
+
+.chart-card button time {
+  justify-self: end;
+  white-space: nowrap;
 }
 
 .library-hero {
@@ -2199,6 +2260,12 @@ input[type='range'] {
     display: grid;
     grid-template-columns: 1fr 1fr;
     overflow-x: visible;
+  }
+
+  .top-actions .ghost-button,
+  .top-actions .primary-button {
+    padding-inline: 10px;
+    white-space: normal;
   }
 
   .content {
