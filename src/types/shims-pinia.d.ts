@@ -1,10 +1,8 @@
 /**
  * Pinia类型声明文件
- * @description 为Pinia相关模块提供类型声明
+ * @description 引用官方类型，避免覆盖 Pinia 导出。
  */
 
-declare module 'pinia' {
-  export interface PiniaCustomProperties {
-    // 在这里可以添加自定义的Pinia属性
-  }
-} 
+import 'pinia';
+
+export {};
