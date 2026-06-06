@@ -361,6 +361,7 @@ const activeView = ref<ViewKey>('discover')
 const activeMood = ref<MoodKey>('全部')
 const searchKeyword = ref('')
 const isSearchFocused = ref(false)
+let searchBlurTimer: number | undefined
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const currentTrack = ref<Track>(restoreCurrentTrack(storedPlayerState, initialQueue))
@@ -375,15 +376,18 @@ const toastMessage = ref('')
 
 const filteredTracks = computed(() => {
   const keyword = searchKeyword.value.trim().toLowerCase()
+
+  if (keyword) {
+    return tracks.filter((track) => {
+      return [track.title, track.artist, track.album].some((field) => field.toLowerCase().includes(keyword))
+    })
+  }
+
   const moodTracks = activeMood.value === '全部'
     ? tracks
     : tracks.filter((track) => track.mood.includes(activeMood.value))
 
-  if (!keyword) return moodTracks
-
-  return moodTracks.filter((track) => {
-    return [track.title, track.artist, track.album].some((field) => field.toLowerCase().includes(keyword))
-  })
+  return moodTracks
 })
 
 const searchSuggestions = computed(() => {
@@ -405,6 +409,16 @@ const hasEmptySearchResult = computed(() => {
 
 const hasVisibleSearchSuggestions = computed(() => {
   return isSearchFocused.value && searchSuggestions.value.length > 0
+})
+
+const trackPanelTitle = computed(() => {
+  return searchKeyword.value.trim() ? '全站搜索结果' : '今日推荐歌曲'
+})
+
+const trackPanelSummary = computed(() => {
+  const keyword = searchKeyword.value.trim()
+  if (keyword) return `${filteredTracks.value.length} 首匹配「${keyword}」`
+  return `${filteredTracks.value.length} 首匹配`
 })
 
 const heroStyle = computed(() => {
@@ -465,6 +479,11 @@ onMounted(() => {
 function setView(view: ViewKey) {
   activeView.value = view
   isQueueOpen.value = false
+  if (view !== 'discover') {
+    searchKeyword.value = ''
+    activeMood.value = '全部'
+    closeSearchSuggestions()
+  }
 }
 
 /**
@@ -473,6 +492,8 @@ function setView(view: ViewKey) {
  */
 function selectMood(mood: MoodKey) {
   activeMood.value = mood
+  searchKeyword.value = ''
+  closeSearchSuggestions()
 }
 
 /**
@@ -481,16 +502,72 @@ function selectMood(mood: MoodKey) {
 function clearSearch() {
   searchKeyword.value = ''
   activeMood.value = '全部'
+  closeSearchSuggestions()
+}
+
+/**
+ * 取消待执行的搜索建议关闭任务。
+ */
+function cancelSearchBlurTimer() {
+  if (searchBlurTimer === undefined) return
+  window.clearTimeout(searchBlurTimer)
+  searchBlurTimer = undefined
+}
+
+/**
+ * 打开搜索建议面板。
+ */
+function openSearchSuggestions() {
+  cancelSearchBlurTimer()
+  isSearchFocused.value = true
+}
+
+/**
+ * 关闭搜索建议面板。
+ */
+function closeSearchSuggestions() {
+  cancelSearchBlurTimer()
   isSearchFocused.value = false
+}
+
+/**
+ * 将关键词搜索切换为全站结果视图。
+ */
+function activateGlobalSearchView() {
+  if (!searchKeyword.value.trim()) return
+  activeMood.value = '全部'
+  activeView.value = 'discover'
+  isQueueOpen.value = false
+}
+
+/**
+ * 响应搜索输入，确保结果列表和建议同时更新。
+ * @param event 输入事件
+ */
+function handleSearchInput(event: Event) {
+  openSearchSuggestions()
+  const target = event.target as HTMLInputElement
+  searchKeyword.value = target.value
+  if (target.value.trim()) activateGlobalSearchView()
 }
 
 /**
  * 延迟关闭搜索建议，保证点击建议项能先完成。
  */
-function blurSearch() {
-  window.setTimeout(() => {
+function scheduleCloseSearchSuggestions() {
+  cancelSearchBlurTimer()
+  searchBlurTimer = window.setTimeout(() => {
     isSearchFocused.value = false
+    searchBlurTimer = undefined
   }, 120)
+}
+
+/**
+ * 确认当前关键词搜索。
+ */
+function confirmSearch() {
+  activateGlobalSearchView()
+  closeSearchSuggestions()
 }
 
 /**
@@ -752,7 +829,9 @@ function resetQueue() {
 function selectSuggestion(track: Track) {
   searchKeyword.value = track.title
   activeMood.value = '全部'
-  isSearchFocused.value = false
+  activeView.value = 'discover'
+  isQueueOpen.value = false
+  closeSearchSuggestions()
 }
 </script>
 
@@ -799,14 +878,18 @@ function selectSuggestion(track: Track) {
             type="search"
             placeholder="搜索歌曲、专辑、歌手"
             aria-label="搜索音乐"
-            @blur="blurSearch"
-            @focus="isSearchFocused = true"
+            @blur="scheduleCloseSearchSuggestions"
+            @focus="openSearchSuggestions"
+            @input="handleSearchInput"
+            @keydown.enter.prevent="confirmSearch"
+            @keydown.escape="closeSearchSuggestions"
           />
           <div v-if="hasVisibleSearchSuggestions" class="suggestions">
             <button
               v-for="track in searchSuggestions"
               :key="track.id"
               type="button"
+              @mousedown.prevent
               @click="selectSuggestion(track)"
             >
               <img :src="track.cover" :alt="track.album" />
@@ -868,8 +951,8 @@ function selectSuggestion(track: Track) {
           <section class="main-grid">
             <div class="track-panel">
               <div class="panel-heading">
-                <h3>今日推荐歌曲</h3>
-                <small>{{ filteredTracks.length }} 首匹配</small>
+                <h3>{{ trackPanelTitle }}</h3>
+                <small>{{ trackPanelSummary }}</small>
               </div>
 
               <article
