@@ -1,57 +1,50 @@
-<script setup lang="ts">
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
-import { NConfigProvider, NMessageProvider } from 'naive-ui';
-
-const route = useRoute();
-
-// 需要缓存的组件名称列表
-const cachedViews = computed(() => {
-  if (route.meta.keepAlive) {
-    return [route.name as string];
-  }
-  return [];
-});
-</script>
-
 <template>
-  <NConfigProvider>
-    <NMessageProvider>
-      <router-view v-slot="{ Component }">
-        <keep-alive :include="cachedViews">
-          <component :is="Component" />
-        </keep-alive>
-      </router-view>
-    </NMessageProvider>
-  </NConfigProvider>
+  <main class="app-shell">
+    <section class="release-panel">
+      <p class="release-eyebrow">Netease Cloud Music</p>
+      <h1>产品级音乐网站正在载入</h1>
+      <p>发布入口已收敛，后续功能模块会在这条干净路径上逐步交付。</p>
+    </section>
+  </main>
 </template>
 
-<style>
-#app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
-    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+<style scoped>
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  background: #f6f2ea;
+  color: #171312;
 }
 
-/* 全局过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
+.release-panel {
+  max-width: 680px;
+  padding: 36px;
+  border: 1px solid #ded4c2;
+  border-radius: 8px;
+  background: #fffaf1;
+  box-shadow: 0 18px 60px rgb(71 42 24 / 12%);
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.release-eyebrow {
+  margin: 0 0 12px;
+  color: #b3261e;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
-/* 进度条样式 */
-#nprogress .bar {
-  background: var(--primary-color) !important;
+h1 {
+  margin: 0 0 12px;
+  font-size: clamp(32px, 6vw, 56px);
+  line-height: 1.02;
 }
 
-#nprogress .peg {
-  box-shadow: 0 0 10px var(--primary-color), 0 0 5px var(--primary-color) !important;
+p {
+  margin: 0;
+  color: #665b4e;
+  font-size: 17px;
 }
 </style>
