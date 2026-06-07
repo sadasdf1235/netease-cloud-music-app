@@ -868,6 +868,10 @@ const settingsButtonLabel = computed(() => {
   return `打开播放设置，当前音质 ${currentQualityMeta.value.label}`
 })
 
+const currentTrackLikeLabel = computed(() => {
+  return isLiked(currentTrack.value) ? `取消收藏 ${currentTrack.value.title}` : `收藏 ${currentTrack.value.title}`
+})
+
 /**
  * 保存播放器和个人音乐状态。
  */
@@ -2520,7 +2524,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
         >
           <span :class="playModeMeta.icon" aria-hidden="true"></span>
         </button>
-        <button type="button" class="icon-button" @click="toggleLike(currentTrack)" aria-label="收藏当前歌曲">
+        <button type="button" class="icon-button" @click="toggleLike(currentTrack)" :aria-label="currentTrackLikeLabel">
           <span :class="isLiked(currentTrack) ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" aria-hidden="true"></span>
         </button>
         <button
