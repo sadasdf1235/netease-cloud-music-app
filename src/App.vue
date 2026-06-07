@@ -377,6 +377,14 @@ function createSearchAlbumResults(matchedTracks: Track[]): SearchAlbumResult[] {
 }
 
 /**
+ * 获取全部专辑列表。
+ * @returns 按播放量排序后的专辑集合
+ */
+function createAlbumResults() {
+  return createSearchAlbumResults(tracks)
+}
+
+/**
  * 获取艺人的全部歌曲。
  * @param artist 目标艺人
  * @returns 该艺人名下歌曲
@@ -600,8 +608,10 @@ const playMode = ref<PlayMode>(restorePlayMode(storedPlayerState))
 const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
 const toastMessage = ref('')
+const albums = createAlbumResults()
 const selectedPlaylist = ref<Playlist>(playlists[0])
 const selectedArtist = ref<Artist>(artists[0])
+const selectedAlbum = ref<SearchAlbumResult>(albums[0])
 
 const normalizedSearchKeyword = computed(() => searchKeyword.value.trim())
 
@@ -656,6 +666,10 @@ const selectedPlaylistStats = computed<PlaylistStat[]>(() => {
     { label: '总时长', value: formatTime(getPlaylistTotalDuration(selectedPlaylist.value)), icon: 'i-carbon-time' },
     { label: '播放量', value: formatPlayCount(getPlaylistTotalPlays(selectedPlaylist.value)), icon: 'i-carbon-activity' },
   ]
+})
+
+const selectedAlbumLeadTrack = computed(() => {
+  return selectedAlbum.value.tracks[0]
 })
 
 const featuredChart = charts[0]
@@ -983,6 +997,14 @@ function selectArtist(artist: Artist) {
 }
 
 /**
+ * 选择要查看详情的专辑。
+ * @param album 目标专辑
+ */
+function selectAlbum(album: SearchAlbumResult) {
+  selectedAlbum.value = album
+}
+
+/**
  * 播放指定歌曲。
  * @param track 目标歌曲
  * @param source 播放来源列表
@@ -1050,6 +1072,28 @@ function addPlaylistToQueue(playlist: Playlist) {
 
   queue.value = [...queue.value, ...nextTracks]
   showToast(`已添加《${playlist.title}》到队列`)
+}
+
+/**
+ * 播放指定专辑。
+ * @param album 目标专辑
+ */
+function playAlbum(album: SearchAlbumResult) {
+  const [firstTrack] = album.tracks
+  if (!firstTrack) return
+  selectAlbum(album)
+  void playTrack(firstTrack, album.tracks)
+  showToast(`开始播放《${album.title}》`)
+}
+
+/**
+ * 播放专辑中的指定歌曲。
+ * @param album 歌曲所属专辑
+ * @param track 目标歌曲
+ */
+function playAlbumTrack(album: SearchAlbumResult, track: Track) {
+  selectAlbum(album)
+  void playTrack(track, album.tracks)
 }
 
 /**
@@ -1284,10 +1328,7 @@ function selectSearchArtist(artistName: string) {
  * @param album 搜索专辑结果
  */
 function playSearchAlbum(album: SearchAlbumResult) {
-  const [firstTrack] = album.tracks
-  if (!firstTrack) return
-  void playTrack(firstTrack, album.tracks)
-  showToast(`开始播放《${album.title}》`)
+  playAlbum(album)
 }
 </script>
 
@@ -1625,6 +1666,79 @@ function playSearchAlbum(album: SearchAlbumResult) {
                 </button>
               </div>
             </div>
+          </section>
+
+          <section class="album-section" aria-label="新碟速览">
+            <div class="section-row compact">
+              <div>
+                <span class="section-kicker">Albums</span>
+                <h2>新碟与专辑</h2>
+              </div>
+              <p class="section-note">按完整作品收听，把一组声音连成更完整的叙事。</p>
+            </div>
+
+            <div class="album-grid">
+              <button
+                v-for="album in albums"
+                :key="album.key"
+                type="button"
+                :class="['album-card', { active: selectedAlbum.key === album.key }]"
+                @click="selectAlbum(album)"
+              >
+                <img :src="album.cover" :alt="album.title" />
+                <span>
+                  <strong>{{ album.title }}</strong>
+                  <small>{{ album.artist }} · {{ album.tracks.length }} 首</small>
+                </span>
+              </button>
+            </div>
+
+            <section class="album-detail" aria-label="专辑详情">
+              <div class="album-detail-cover">
+                <img :src="selectedAlbum.cover" :alt="selectedAlbum.title" />
+              </div>
+
+              <div class="album-detail-body">
+                <div class="album-detail-head">
+                  <div>
+                    <span class="section-kicker">Album Focus</span>
+                    <h3>{{ selectedAlbum.title }}</h3>
+                    <p>{{ selectedAlbum.artist }} · {{ selectedAlbum.tracks.length }} 首 · {{ formatTime(selectedAlbum.totalDuration) }}</p>
+                    <small>累计播放 {{ formatPlayCount(selectedAlbum.totalPlays) }}</small>
+                  </div>
+                  <div class="album-detail-actions">
+                    <button type="button" class="primary-button" @click="playAlbum(selectedAlbum)">
+                      <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                      播放专辑
+                    </button>
+                    <button
+                      v-if="selectedAlbumLeadTrack"
+                      type="button"
+                      class="ghost-button"
+                      @click="playAlbumTrack(selectedAlbum, selectedAlbumLeadTrack)"
+                    >
+                      <span class="i-carbon-headphones" aria-hidden="true"></span>
+                      试听主打
+                    </button>
+                  </div>
+                </div>
+
+                <div class="album-track-list">
+                  <button
+                    v-for="(track, index) in selectedAlbum.tracks"
+                    :key="track.id"
+                    type="button"
+                    class="album-track-button"
+                    @click="playAlbumTrack(selectedAlbum, track)"
+                  >
+                    <span>{{ String(index + 1).padStart(2, '0') }}</span>
+                    <img :src="track.cover" :alt="track.album" />
+                    <strong>{{ track.title }}</strong>
+                    <time>{{ formatTime(track.duration) }}</time>
+                  </button>
+                </div>
+              </div>
+            </section>
           </section>
 
           <section class="artist-strip">
@@ -2136,6 +2250,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .playlist-card button,
 .playlist-detail-button,
 .playlist-detail-track,
+.album-card,
+.album-track-button,
 .chart-play-button,
 .chart-track-button,
 .artist-card,
@@ -2673,6 +2789,9 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .playlist-detail-body,
 .playlist-detail-head > div,
 .playlist-track-copy,
+.album-card span,
+.album-detail-body,
+.album-detail-head > div,
 .artist-detail-profile > div,
 .artist-track-button span,
 .chart-track-meta,
@@ -2688,6 +2807,9 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .playlist-card p,
 .playlist-track-copy strong,
 .playlist-track-copy small,
+.album-card strong,
+.album-card small,
+.album-track-button strong,
 .artist-track-button strong,
 .artist-track-button small,
 .chart-track-meta strong,
@@ -3066,6 +3188,180 @@ function playSearchAlbum(album: SearchAlbumResult) {
 }
 
 .playlist-detail-track time {
+  justify-self: end;
+}
+
+.album-section {
+  display: grid;
+  gap: 16px;
+}
+
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.album-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgb(34 28 23 / 10%);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.album-card.active {
+  border-color: rgb(179 38 30 / 32%);
+  box-shadow: 0 16px 46px rgb(179 38 30 / 12%);
+  transform: translateY(-2px);
+}
+
+.album-card img {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.album-card span,
+.album-card strong,
+.album-card small {
+  display: block;
+}
+
+.album-card small {
+  color: #756c62;
+}
+
+.album-detail {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid rgb(34 28 23 / 10%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(18 22 30 / 94%), rgb(36 106 115 / 88%)),
+    #121620;
+  color: #fff;
+  box-shadow: 0 20px 60px rgb(18 22 30 / 18%);
+}
+
+.album-detail .section-kicker {
+  color: #ffcf66;
+}
+
+.album-detail-cover img {
+  width: 100%;
+  height: 100%;
+  min-height: 260px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.album-detail-body {
+  display: grid;
+  gap: 16px;
+}
+
+.album-detail-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.album-detail-head h3,
+.album-detail-head p {
+  margin: 0;
+}
+
+.album-detail-head h3 {
+  font-size: clamp(30px, 4vw, 46px);
+  line-height: 1;
+}
+
+.album-detail-head p,
+.album-detail-head small {
+  color: rgb(255 255 255 / 72%);
+}
+
+.album-detail-head p {
+  margin-top: 10px;
+}
+
+.album-detail-head small {
+  display: block;
+  margin-top: 10px;
+}
+
+.album-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.album-detail .primary-button {
+  background: #fff;
+  color: #121620;
+  box-shadow: none;
+}
+
+.album-detail .ghost-button {
+  border-color: rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 10%);
+  color: #fff;
+}
+
+.album-track-list {
+  display: grid;
+  gap: 8px;
+}
+
+.album-track-button {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px 46px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 10%);
+  color: inherit;
+  text-align: left;
+}
+
+.album-track-button:hover {
+  background: rgb(255 255 255 / 16%);
+}
+
+.album-track-button span,
+.album-track-button time {
+  color: rgb(255 255 255 / 66%);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.album-track-button img {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.album-track-button time {
   justify-self: end;
 }
 
@@ -3969,6 +4265,7 @@ input[type='range'] {
   .main-grid,
   .chart-grid,
   .playlist-grid,
+  .album-grid,
   .library-dashboard,
   .recent-grid,
   .artist-list {
@@ -3985,6 +4282,15 @@ input[type='range'] {
   }
 
   .playlist-detail-cover img {
+    height: 280px;
+    min-height: 0;
+  }
+
+  .album-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .album-detail-cover img {
     height: 280px;
     min-height: 0;
   }
@@ -4075,6 +4381,8 @@ input[type='range'] {
   .playlist-grid,
   .playlist-detail,
   .playlist-stat-grid,
+  .album-grid,
+  .album-detail,
   .chart-grid,
   .chart-dashboard,
   .library-dashboard,
@@ -4200,6 +4508,34 @@ input[type='range'] {
 
   .playlist-detail-track em {
     display: none;
+  }
+
+  .album-detail {
+    padding: 14px;
+  }
+
+  .album-detail-cover img {
+    height: 220px;
+  }
+
+  .album-detail-head,
+  .album-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .album-detail-actions .primary-button,
+  .album-detail-actions .ghost-button {
+    width: 100%;
+  }
+
+  .album-track-button {
+    grid-template-columns: 24px 42px minmax(0, 1fr) 42px;
+  }
+
+  .album-track-button img {
+    width: 42px;
+    height: 42px;
   }
 
   .artist-detail {
