@@ -13,6 +13,12 @@ interface Artist {
   listeners: string
 }
 
+interface ArtistStat {
+  label: string
+  value: string
+  icon: string
+}
+
 interface Track {
   id: number
   title: string
@@ -371,6 +377,33 @@ function createSearchAlbumResults(matchedTracks: Track[]): SearchAlbumResult[] {
 }
 
 /**
+ * 获取艺人的全部歌曲。
+ * @param artist 目标艺人
+ * @returns 该艺人名下歌曲
+ */
+function getArtistTracks(artist: Artist) {
+  return tracks.filter((track) => track.artist === artist.name)
+}
+
+/**
+ * 获取艺人播放量合计。
+ * @param artist 目标艺人
+ * @returns 该艺人歌曲播放量合计
+ */
+function getArtistTotalPlays(artist: Artist) {
+  return getArtistTracks(artist).reduce((total, track) => total + track.plays, 0)
+}
+
+/**
+ * 获取艺人的热门歌曲。
+ * @param artist 目标艺人
+ * @returns 按播放量排序后的歌曲
+ */
+function getArtistPopularTracks(artist: Artist) {
+  return [...getArtistTracks(artist)].sort((current, next) => next.plays - current.plays)
+}
+
+/**
  * 获取歌单总时长。
  * @param playlist 歌单数据
  * @returns 歌单内歌曲时长合计
@@ -568,6 +601,7 @@ const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
 const toastMessage = ref('')
 const selectedPlaylist = ref<Playlist>(playlists[0])
+const selectedArtist = ref<Artist>(artists[0])
 
 const normalizedSearchKeyword = computed(() => searchKeyword.value.trim())
 
@@ -660,6 +694,22 @@ const favoriteArtists = computed(() => {
     .sort(([, currentCount], [, nextCount]) => nextCount - currentCount)
     .slice(0, 3)
     .map(([name, count]) => ({ name, count }))
+})
+
+const selectedArtistTracks = computed(() => {
+  return getArtistPopularTracks(selectedArtist.value)
+})
+
+const selectedArtistLeadTrack = computed(() => {
+  return selectedArtistTracks.value[0]
+})
+
+const selectedArtistStats = computed<ArtistStat[]>(() => {
+  return [
+    { label: '作品', value: `${selectedArtistTracks.value.length} 首`, icon: 'i-carbon-music' },
+    { label: '累计播放', value: formatPlayCount(getArtistTotalPlays(selectedArtist.value)), icon: 'i-carbon-activity' },
+    { label: '月听众', value: selectedArtist.value.listeners, icon: 'i-carbon-user-multiple' },
+  ]
 })
 
 const hasEmptySearchResult = computed(() => {
@@ -925,6 +975,14 @@ function selectPlaylist(playlist: Playlist) {
 }
 
 /**
+ * 选择要查看详情的艺人。
+ * @param artist 目标艺人
+ */
+function selectArtist(artist: Artist) {
+  selectedArtist.value = artist
+}
+
+/**
  * 播放指定歌曲。
  * @param track 目标歌曲
  * @param source 播放来源列表
@@ -953,6 +1011,19 @@ function playPlaylist(playlist: Playlist) {
   if (!firstTrack) return
   void playTrack(firstTrack, playlist.tracks)
   showToast(`开始播放《${playlist.title}》`)
+}
+
+/**
+ * 播放艺人热门歌曲。
+ * @param artist 目标艺人
+ */
+function playArtist(artist: Artist) {
+  const artistTracks = getArtistPopularTracks(artist)
+  const [firstTrack] = artistTracks
+  if (!firstTrack) return
+  selectArtist(artist)
+  void playTrack(firstTrack, artistTracks)
+  showToast(`开始播放 ${artist.name}`)
 }
 
 /**
@@ -1564,13 +1635,70 @@ function playSearchAlbum(album: SearchAlbumResult) {
               </div>
             </div>
             <div class="artist-list">
-              <article v-for="artist in artists" :key="artist.id" class="artist-card">
+              <button
+                v-for="artist in artists"
+                :key="artist.id"
+                type="button"
+                :class="['artist-card', { active: selectedArtist.id === artist.id }]"
+                @click="selectArtist(artist)"
+              >
                 <img :src="artist.avatar" :alt="artist.name" />
                 <strong>{{ artist.name }}</strong>
                 <span>{{ artist.role }}</span>
                 <small>{{ artist.listeners }}</small>
-              </article>
+              </button>
             </div>
+
+            <section class="artist-detail" aria-label="艺人详情">
+              <div class="artist-detail-profile">
+                <img :src="selectedArtist.avatar" :alt="selectedArtist.name" />
+                <div>
+                  <span class="section-kicker">Artist Radio</span>
+                  <h3>{{ selectedArtist.name }}</h3>
+                  <p>{{ selectedArtist.role }}</p>
+                  <div class="artist-detail-actions">
+                    <button type="button" class="primary-button" @click="playArtist(selectedArtist)">
+                      <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                      播放热门
+                    </button>
+                    <button
+                      v-if="selectedArtistLeadTrack"
+                      type="button"
+                      class="ghost-button"
+                      @click="playTrack(selectedArtistLeadTrack, selectedArtistTracks)"
+                    >
+                      <span class="i-carbon-headphones" aria-hidden="true"></span>
+                      试听代表作
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="artist-stat-grid" aria-label="艺人统计">
+                <article v-for="stat in selectedArtistStats" :key="stat.label" class="artist-stat-card">
+                  <span :class="stat.icon" aria-hidden="true"></span>
+                  <small>{{ stat.label }}</small>
+                  <strong>{{ stat.value }}</strong>
+                </article>
+              </div>
+
+              <div class="artist-track-list">
+                <button
+                  v-for="track in selectedArtistTracks"
+                  :key="track.id"
+                  type="button"
+                  class="artist-track-button"
+                  @click="playTrack(track, selectedArtistTracks)"
+                >
+                  <img :src="track.cover" :alt="track.album" />
+                  <span>
+                    <strong>{{ track.title }}</strong>
+                    <small>{{ track.album }} · {{ formatPlayCount(track.plays) }}</small>
+                  </span>
+                  <time>{{ formatTime(track.duration) }}</time>
+                </button>
+              </div>
+            </section>
           </section>
         </section>
 
@@ -2010,6 +2138,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .playlist-detail-track,
 .chart-play-button,
 .chart-track-button,
+.artist-card,
+.artist-track-button,
 .recent-card,
 .search-mini-track,
 .search-artist-card,
@@ -2543,6 +2673,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .playlist-detail-body,
 .playlist-detail-head > div,
 .playlist-track-copy,
+.artist-detail-profile > div,
+.artist-track-button span,
 .chart-track-meta,
 .continue-card > div,
 .recent-card span,
@@ -2556,6 +2688,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .playlist-card p,
 .playlist-track-copy strong,
 .playlist-track-copy small,
+.artist-track-button strong,
+.artist-track-button small,
 .chart-track-meta strong,
 .chart-track-meta small,
 .continue-card h3,
@@ -2945,10 +3079,23 @@ function playSearchAlbum(album: SearchAlbumResult) {
 }
 
 .artist-card {
+  min-width: 0;
   padding: 16px;
   border: 1px solid rgb(34 28 23 / 10%);
   border-radius: 8px;
   background: #fff;
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.artist-card.active {
+  border-color: rgb(36 106 115 / 38%);
+  box-shadow: 0 18px 52px rgb(36 106 115 / 13%);
+  transform: translateY(-2px);
 }
 
 .artist-card img {
@@ -2968,6 +3115,129 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .artist-card span,
 .artist-card small {
   color: #6f665c;
+}
+
+.artist-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+  gap: 16px;
+  align-items: stretch;
+  padding: 16px;
+  border: 1px solid rgb(34 28 23 / 10%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 84%);
+  box-shadow: 0 16px 48px rgb(31 23 17 / 8%);
+}
+
+.artist-detail-profile {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.artist-detail-profile > img {
+  width: 132px;
+  height: 132px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.artist-detail-profile h3,
+.artist-detail-profile p {
+  margin: 0;
+}
+
+.artist-detail-profile h3 {
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1;
+}
+
+.artist-detail-profile p {
+  margin-top: 10px;
+  color: #6f665c;
+}
+
+.artist-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.artist-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+.artist-stat-card {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f6f8fb;
+}
+
+.artist-stat-card > span {
+  color: #246a73;
+  font-size: 20px;
+}
+
+.artist-stat-card small {
+  color: #756c62;
+}
+
+.artist-stat-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artist-track-list {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.artist-track-button {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f6f8fb;
+  color: inherit;
+  text-align: left;
+}
+
+.artist-track-button:hover {
+  background: #eef4f1;
+}
+
+.artist-track-button img {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.artist-track-button span {
+  display: grid;
+  gap: 3px;
+}
+
+.artist-track-button time {
+  justify-self: end;
+  color: #756c62;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .chart-grid {
@@ -3719,6 +3989,14 @@ input[type='range'] {
     min-height: 0;
   }
 
+  .artist-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .artist-track-list {
+    grid-column: 1 / -1;
+  }
+
   .chart-stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -3803,6 +4081,8 @@ input[type='range'] {
   .library-grid,
   .recent-grid,
   .artist-list,
+  .artist-detail,
+  .artist-stat-grid,
   .search-groups {
     grid-template-columns: 1fr;
   }
@@ -3920,6 +4200,38 @@ input[type='range'] {
 
   .playlist-detail-track em {
     display: none;
+  }
+
+  .artist-detail {
+    padding: 14px;
+  }
+
+  .artist-detail-profile {
+    grid-template-columns: 1fr;
+  }
+
+  .artist-detail-profile > img {
+    width: 100%;
+    height: 220px;
+  }
+
+  .artist-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .artist-detail-actions .primary-button,
+  .artist-detail-actions .ghost-button {
+    width: 100%;
+  }
+
+  .artist-track-button {
+    grid-template-columns: 44px minmax(0, 1fr) 42px;
+  }
+
+  .artist-track-button img {
+    width: 44px;
+    height: 44px;
   }
 
   .player-bar {
