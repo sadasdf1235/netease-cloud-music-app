@@ -37,6 +37,12 @@ interface Playlist {
   tracks: Track[]
 }
 
+interface PlaylistStat {
+  label: string
+  value: string
+  icon: string
+}
+
 interface Chart {
   id: number
   title: string
@@ -365,6 +371,34 @@ function createSearchAlbumResults(matchedTracks: Track[]): SearchAlbumResult[] {
 }
 
 /**
+ * 获取歌单总时长。
+ * @param playlist 歌单数据
+ * @returns 歌单内歌曲时长合计
+ */
+function getPlaylistTotalDuration(playlist: Playlist) {
+  return playlist.tracks.reduce((total, track) => total + track.duration, 0)
+}
+
+/**
+ * 获取歌单总播放量。
+ * @param playlist 歌单数据
+ * @returns 歌单内歌曲播放量合计
+ */
+function getPlaylistTotalPlays(playlist: Playlist) {
+  return playlist.tracks.reduce((total, track) => total + track.plays, 0)
+}
+
+/**
+ * 获取歌单主要艺人摘要。
+ * @param playlist 歌单数据
+ * @returns 前两位艺人组成的摘要
+ */
+function getPlaylistArtistSummary(playlist: Playlist) {
+  const artistNames = [...new Set(playlist.tracks.map((track) => track.artist))]
+  return artistNames.slice(0, 2).join(' / ')
+}
+
+/**
  * 获取榜单总播放量。
  * @param chart 榜单数据
  * @returns 榜单内歌曲播放量合计
@@ -533,6 +567,7 @@ const playMode = ref<PlayMode>(restorePlayMode(storedPlayerState))
 const isQueueOpen = ref(false)
 const isLyricOpen = ref(false)
 const toastMessage = ref('')
+const selectedPlaylist = ref<Playlist>(playlists[0])
 
 const normalizedSearchKeyword = computed(() => searchKeyword.value.trim())
 
@@ -575,6 +610,18 @@ const searchResultSummary = computed(() => {
   if (!isSearching.value) return ''
   if (!filteredTracks.value.length) return `暂无与「${normalizedSearchKeyword.value}」相关的内容`
   return `${filteredTracks.value.length} 首歌曲 · ${searchResultArtists.value.length} 位艺人 · ${searchResultAlbums.value.length} 张专辑`
+})
+
+const selectedPlaylistArtistSummary = computed(() => {
+  return getPlaylistArtistSummary(selectedPlaylist.value)
+})
+
+const selectedPlaylistStats = computed<PlaylistStat[]>(() => {
+  return [
+    { label: '曲目', value: `${selectedPlaylist.value.tracks.length} 首`, icon: 'i-carbon-music' },
+    { label: '总时长', value: formatTime(getPlaylistTotalDuration(selectedPlaylist.value)), icon: 'i-carbon-time' },
+    { label: '播放量', value: formatPlayCount(getPlaylistTotalPlays(selectedPlaylist.value)), icon: 'i-carbon-activity' },
+  ]
 })
 
 const featuredChart = charts[0]
@@ -870,6 +917,14 @@ function getFavoriteArtistShare(count: number) {
 }
 
 /**
+ * 选择要查看详情的歌单。
+ * @param playlist 目标歌单
+ */
+function selectPlaylist(playlist: Playlist) {
+  selectedPlaylist.value = playlist
+}
+
+/**
  * 播放指定歌曲。
  * @param track 目标歌曲
  * @param source 播放来源列表
@@ -898,6 +953,32 @@ function playPlaylist(playlist: Playlist) {
   if (!firstTrack) return
   void playTrack(firstTrack, playlist.tracks)
   showToast(`开始播放《${playlist.title}》`)
+}
+
+/**
+ * 播放歌单中的指定歌曲。
+ * @param playlist 歌曲所属歌单
+ * @param track 目标歌曲
+ */
+function playPlaylistTrack(playlist: Playlist, track: Track) {
+  selectPlaylist(playlist)
+  void playTrack(track, playlist.tracks)
+}
+
+/**
+ * 将歌单中未在队列内的歌曲追加到播放队列。
+ * @param playlist 目标歌单
+ */
+function addPlaylistToQueue(playlist: Playlist) {
+  const nextTracks = playlist.tracks.filter((track) => !queue.value.some((item) => item.id === track.id))
+
+  if (!nextTracks.length) {
+    showToast('歌单歌曲已在队列中')
+    return
+  }
+
+  queue.value = [...queue.value, ...nextTracks]
+  showToast(`已添加《${playlist.title}》到队列`)
 }
 
 /**
@@ -1397,18 +1478,82 @@ function playSearchAlbum(album: SearchAlbumResult) {
           </section>
 
           <section class="playlist-grid" aria-label="推荐歌单">
-            <article v-for="playlist in playlists" :key="playlist.id" class="playlist-card">
+            <article
+              v-for="playlist in playlists"
+              :key="playlist.id"
+              :class="['playlist-card', { active: selectedPlaylist.id === playlist.id }]"
+            >
               <img :src="playlist.cover" :alt="playlist.title" />
               <div>
                 <span :style="{ color: playlist.color }">{{ playlist.tag }}</span>
                 <h3>{{ playlist.title }}</h3>
                 <p>{{ playlist.subtitle }}</p>
-                <button type="button" @click="playPlaylist(playlist)">
-                  <span class="i-carbon-play-filled" aria-hidden="true"></span>
-                  播放歌单
-                </button>
+                <div class="playlist-card-actions">
+                  <button type="button" @click="playPlaylist(playlist)">
+                    <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                    播放
+                  </button>
+                  <button type="button" class="playlist-detail-button" @click="selectPlaylist(playlist)">
+                    <span class="i-carbon-view" aria-hidden="true"></span>
+                    详情
+                  </button>
+                </div>
               </div>
             </article>
+          </section>
+
+          <section class="playlist-detail" :style="{ '--accent': selectedPlaylist.color }" aria-label="歌单详情">
+            <div class="playlist-detail-cover">
+              <img :src="selectedPlaylist.cover" :alt="selectedPlaylist.title" />
+            </div>
+
+            <div class="playlist-detail-body">
+              <div class="playlist-detail-head">
+                <div>
+                  <span class="section-kicker">{{ selectedPlaylist.tag }}</span>
+                  <h2>{{ selectedPlaylist.title }}</h2>
+                  <p>{{ selectedPlaylist.subtitle }}</p>
+                  <small>{{ selectedPlaylistArtistSummary }}</small>
+                </div>
+                <div class="playlist-detail-actions">
+                  <button type="button" class="primary-button" @click="playPlaylist(selectedPlaylist)">
+                    <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                    播放全部
+                  </button>
+                  <button type="button" class="ghost-button" @click="addPlaylistToQueue(selectedPlaylist)">
+                    <span class="i-carbon-add-alt" aria-hidden="true"></span>
+                    加入队列
+                  </button>
+                </div>
+              </div>
+
+              <div class="playlist-stat-grid" aria-label="歌单统计">
+                <article v-for="stat in selectedPlaylistStats" :key="stat.label" class="playlist-stat-card">
+                  <span :class="stat.icon" aria-hidden="true"></span>
+                  <small>{{ stat.label }}</small>
+                  <strong>{{ stat.value }}</strong>
+                </article>
+              </div>
+
+              <div class="playlist-detail-list">
+                <button
+                  v-for="(track, index) in selectedPlaylist.tracks"
+                  :key="track.id"
+                  type="button"
+                  class="playlist-detail-track"
+                  @click="playPlaylistTrack(selectedPlaylist, track)"
+                >
+                  <span class="playlist-track-index">{{ String(index + 1).padStart(2, '0') }}</span>
+                  <img :src="track.cover" :alt="track.album" />
+                  <span class="playlist-track-copy">
+                    <strong>{{ track.title }}</strong>
+                    <small>{{ track.artist }} · {{ track.album }}</small>
+                  </span>
+                  <em>{{ formatPlayCount(track.plays) }}</em>
+                  <time>{{ formatTime(track.duration) }}</time>
+                </button>
+              </div>
+            </div>
           </section>
 
           <section class="artist-strip">
@@ -1861,6 +2006,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .cover-button,
 .mood-tabs button,
 .playlist-card button,
+.playlist-detail-button,
+.playlist-detail-track,
 .chart-play-button,
 .chart-track-button,
 .recent-card,
@@ -2393,6 +2540,9 @@ function playSearchAlbum(album: SearchAlbumResult) {
 
 .track-meta,
 .playlist-card > div,
+.playlist-detail-body,
+.playlist-detail-head > div,
+.playlist-track-copy,
 .chart-track-meta,
 .continue-card > div,
 .recent-card span,
@@ -2404,6 +2554,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .track-meta small,
 .playlist-card h3,
 .playlist-card p,
+.playlist-track-copy strong,
+.playlist-track-copy small,
 .chart-track-meta strong,
 .chart-track-meta small,
 .continue-card h3,
@@ -2574,11 +2726,22 @@ function playSearchAlbum(album: SearchAlbumResult) {
 }
 
 .playlist-card {
+  position: relative;
   display: grid;
   grid-template-columns: 136px 1fr;
   gap: 16px;
   min-width: 0;
   padding: 14px;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.playlist-card.active {
+  border-color: rgb(179 38 30 / 36%);
+  box-shadow: 0 18px 56px rgb(179 38 30 / 14%);
+  transform: translateY(-2px);
 }
 
 .playlist-card img {
@@ -2597,16 +2760,179 @@ function playSearchAlbum(album: SearchAlbumResult) {
   color: #6b6258;
 }
 
+.playlist-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .playlist-card button {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
   gap: 6px;
-  margin-top: 10px;
   padding: 8px 11px;
   border-radius: 8px;
   background: #121620;
   color: #fff;
+}
+
+.playlist-detail-button {
+  border: 1px solid rgb(34 28 23 / 12%);
+  background: #fff !important;
+  color: #28231f !important;
+}
+
+.playlist-detail {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.42fr) minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid rgb(34 28 23 / 10%);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 90%), rgb(255 255 255 / 72%)),
+    linear-gradient(135deg, var(--accent), transparent 44%);
+  box-shadow: 0 16px 48px rgb(31 23 17 / 8%);
+}
+
+.playlist-detail-cover {
+  min-width: 0;
+}
+
+.playlist-detail-cover img {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.playlist-detail-body {
+  display: grid;
+  gap: 16px;
+}
+
+.playlist-detail-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.playlist-detail-head h2,
+.playlist-detail-head p {
+  margin: 0;
+}
+
+.playlist-detail-head h2 {
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1;
+}
+
+.playlist-detail-head p {
+  max-width: 620px;
+  margin-top: 10px;
+  color: #6b6258;
+}
+
+.playlist-detail-head small {
+  display: block;
+  margin-top: 10px;
+  color: #756c62;
+}
+
+.playlist-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.playlist-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.playlist-stat-card {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 74%);
+}
+
+.playlist-stat-card > span {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.playlist-stat-card small {
+  color: #756c62;
+}
+
+.playlist-stat-card strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playlist-detail-list {
+  display: grid;
+  gap: 8px;
+}
+
+.playlist-detail-track {
+  min-width: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 30px 48px minmax(0, 1fr) 72px 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 64%);
+  color: inherit;
+  text-align: left;
+}
+
+.playlist-detail-track:hover {
+  background: #eef4f1;
+}
+
+.playlist-detail-track img {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.playlist-track-index,
+.playlist-detail-track em,
+.playlist-detail-track time {
+  color: #756c62;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.playlist-track-index {
+  font-weight: 900;
+}
+
+.playlist-track-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.playlist-detail-track em {
+  font-style: normal;
+}
+
+.playlist-detail-track time {
+  justify-self: end;
 }
 
 .artist-strip {
@@ -3384,6 +3710,15 @@ input[type='range'] {
     grid-template-columns: 1fr;
   }
 
+  .playlist-detail {
+    grid-template-columns: 1fr;
+  }
+
+  .playlist-detail-cover img {
+    height: 280px;
+    min-height: 0;
+  }
+
   .chart-stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -3460,6 +3795,8 @@ input[type='range'] {
 
   .main-grid,
   .playlist-grid,
+  .playlist-detail,
+  .playlist-stat-grid,
   .chart-grid,
   .chart-dashboard,
   .library-dashboard,
@@ -3549,6 +3886,40 @@ input[type='range'] {
   .playlist-card img {
     width: 104px;
     height: 104px;
+  }
+
+  .playlist-card-actions,
+  .playlist-detail-head,
+  .playlist-detail-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .playlist-card button,
+  .playlist-detail-actions .primary-button,
+  .playlist-detail-actions .ghost-button {
+    width: 100%;
+  }
+
+  .playlist-detail {
+    padding: 14px;
+  }
+
+  .playlist-detail-cover img {
+    height: 220px;
+  }
+
+  .playlist-detail-track {
+    grid-template-columns: 26px 44px minmax(0, 1fr) 44px;
+  }
+
+  .playlist-detail-track img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .playlist-detail-track em {
+    display: none;
   }
 
   .player-bar {
