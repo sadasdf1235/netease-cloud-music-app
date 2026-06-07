@@ -42,7 +42,15 @@ interface Chart {
   title: string
   description: string
   accent: string
+  trend: string
+  updateLabel: string
   tracks: Track[]
+}
+
+interface ChartStat {
+  label: string
+  value: string
+  icon: string
 }
 
 interface SearchArtistResult {
@@ -253,6 +261,8 @@ const charts: Chart[] = [
     title: '云端热歌榜',
     description: '过去 24 小时站内增长最快的歌曲。',
     accent: '#b3261e',
+    trend: '+18%',
+    updateLabel: '每小时刷新',
     tracks: [tracks[5], tracks[3], tracks[0], tracks[7], tracks[2]],
   },
   {
@@ -260,6 +270,8 @@ const charts: Chart[] = [
     title: '独立新声榜',
     description: '编辑部持续追踪的新专和现场录音。',
     accent: '#246a73',
+    trend: '+11%',
+    updateLabel: '每日 10:00',
     tracks: [tracks[1], tracks[6], tracks[4], tracks[3], tracks[0]],
   },
   {
@@ -267,6 +279,8 @@ const charts: Chart[] = [
     title: '效率专注榜',
     description: '更适合长时间沉浸的低干扰作品。',
     accent: '#7b4f9d',
+    trend: '+9%',
+    updateLabel: '工作日更新',
     tracks: [tracks[2], tracks[6], tracks[4], tracks[1], tracks[3]],
   },
 ]
@@ -348,6 +362,35 @@ function createSearchAlbumResults(matchedTracks: Track[]): SearchAlbumResult[] {
       }
     })
     .sort((current, next) => next.totalPlays - current.totalPlays)
+}
+
+/**
+ * 获取榜单总播放量。
+ * @param chart 榜单数据
+ * @returns 榜单内歌曲播放量合计
+ */
+function getChartTotalPlays(chart: Chart) {
+  return chart.tracks.reduce((total, track) => total + track.plays, 0)
+}
+
+/**
+ * 获取榜单平均能量值。
+ * @param chart 榜单数据
+ * @returns 四舍五入后的平均能量
+ */
+function getChartAverageEnergy(chart: Chart) {
+  if (!chart.tracks.length) return 0
+  const totalEnergy = chart.tracks.reduce((total, track) => total + track.energy, 0)
+  return Math.round(totalEnergy / chart.tracks.length)
+}
+
+/**
+ * 获取榜单第一首歌曲。
+ * @param chart 榜单数据
+ * @returns 榜首歌曲
+ */
+function getChartLeadTrack(chart: Chart) {
+  return chart.tracks[0]
 }
 
 /**
@@ -532,6 +575,26 @@ const searchResultSummary = computed(() => {
   if (!isSearching.value) return ''
   if (!filteredTracks.value.length) return `暂无与「${normalizedSearchKeyword.value}」相关的内容`
   return `${filteredTracks.value.length} 首歌曲 · ${searchResultArtists.value.length} 位艺人 · ${searchResultAlbums.value.length} 张专辑`
+})
+
+const featuredChart = charts[0]
+
+const featuredChartLeadTrack = computed(() => {
+  return getChartLeadTrack(featuredChart)
+})
+
+const chartOverviewStats = computed<ChartStat[]>(() => {
+  const totalTrackCount = charts.reduce((total, chart) => total + chart.tracks.length, 0)
+  const totalPlayCount = charts.reduce((total, chart) => total + getChartTotalPlays(chart), 0)
+  const hottestChart = charts.reduce((current, chart) => {
+    return getChartTotalPlays(chart) > getChartTotalPlays(current) ? chart : current
+  }, charts[0])
+
+  return [
+    { label: '榜单覆盖', value: `${totalTrackCount} 首`, icon: 'i-carbon-analytics' },
+    { label: '热度峰值', value: formatPlayCount(totalPlayCount), icon: 'i-carbon-activity' },
+    { label: '主打榜单', value: hottestChart.title, icon: 'i-carbon-star' },
+  ]
 })
 
 const queueIndex = computed(() => queue.value.findIndex((track) => track.id === currentTrack.value.id))
@@ -831,6 +894,17 @@ function playPlaylist(playlist: Playlist) {
   if (!firstTrack) return
   void playTrack(firstTrack, playlist.tracks)
   showToast(`开始播放《${playlist.title}》`)
+}
+
+/**
+ * 播放指定榜单。
+ * @param chart 目标榜单
+ */
+function playChart(chart: Chart) {
+  const [firstTrack] = chart.tracks
+  if (!firstTrack) return
+  void playTrack(firstTrack, chart.tracks)
+  showToast(`开始播放${chart.title}`)
 }
 
 /**
@@ -1360,18 +1434,80 @@ function playSearchAlbum(album: SearchAlbumResult) {
             <p class="section-note">按热度、新声和专注场景拆分，让发现新歌更像一张清晰的工作台。</p>
           </section>
 
+          <section class="chart-dashboard" aria-label="榜单概览">
+            <article class="chart-feature-card" :style="{ '--accent': featuredChart.accent }">
+              <div class="chart-feature-copy">
+                <span class="section-kicker">本日主榜</span>
+                <h3>{{ featuredChart.title }}</h3>
+                <p>{{ featuredChart.description }}</p>
+                <div class="chart-feature-actions">
+                  <button type="button" class="primary-button" @click="playChart(featuredChart)">
+                    <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                    播放整榜
+                  </button>
+                  <button
+                    v-if="featuredChartLeadTrack"
+                    type="button"
+                    class="ghost-button"
+                    @click="playTrack(featuredChartLeadTrack, featuredChart.tracks)"
+                  >
+                    <span class="i-carbon-headphones" aria-hidden="true"></span>
+                    试听榜首
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="featuredChartLeadTrack" class="chart-lead-row">
+                <img :src="featuredChartLeadTrack.cover" :alt="featuredChartLeadTrack.album" />
+                <span>
+                  <small>TOP 1</small>
+                  <strong>{{ featuredChartLeadTrack.title }}</strong>
+                  <em>{{ featuredChartLeadTrack.artist }} · {{ formatPlayCount(featuredChartLeadTrack.plays) }}</em>
+                </span>
+              </div>
+            </article>
+
+            <div class="chart-stat-grid">
+              <article v-for="stat in chartOverviewStats" :key="stat.label" class="chart-stat-card">
+                <span :class="stat.icon" aria-hidden="true"></span>
+                <small>{{ stat.label }}</small>
+                <strong>{{ stat.value }}</strong>
+              </article>
+            </div>
+          </section>
+
           <div class="chart-grid">
             <article v-for="chart in charts" :key="chart.id" class="chart-card" :style="{ '--accent': chart.accent }">
               <div class="chart-head">
                 <span></span>
-                <div>
-                  <h3>{{ chart.title }}</h3>
+                <div class="chart-head-body">
+                  <div class="chart-title-row">
+                    <h3>{{ chart.title }}</h3>
+                    <em>
+                      <span class="i-carbon-arrow-up" aria-hidden="true"></span>
+                      {{ chart.trend }}
+                    </em>
+                  </div>
                   <p>{{ chart.description }}</p>
+                  <div class="chart-meta-row">
+                    <small>
+                      <span class="i-carbon-time" aria-hidden="true"></span>
+                      {{ chart.updateLabel }}
+                    </small>
+                    <small>
+                      <span class="i-carbon-activity" aria-hidden="true"></span>
+                      能量 {{ getChartAverageEnergy(chart) }}%
+                    </small>
+                  </div>
+                  <button type="button" class="chart-play-button" @click="playChart(chart)">
+                    <span class="i-carbon-play-filled" aria-hidden="true"></span>
+                    播放整榜
+                  </button>
                 </div>
               </div>
               <ol>
                 <li v-for="(track, index) in chart.tracks" :key="track.id">
-                  <button type="button" @click="playTrack(track, chart.tracks)">
+                  <button type="button" class="chart-track-button" @click="playTrack(track, chart.tracks)">
                     <span>{{ index + 1 }}</span>
                     <img :src="track.cover" :alt="track.album" />
                     <span class="chart-track-meta">
@@ -1711,7 +1847,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .cover-button,
 .mood-tabs button,
 .playlist-card button,
-.chart-card button,
+.chart-play-button,
+.chart-track-button,
 .recent-card,
 .search-mini-track,
 .search-artist-card,
@@ -2497,14 +2634,159 @@ function playSearchAlbum(album: SearchAlbumResult) {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.chart-dashboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* 榜单概览卡片负责强调主榜和核心播放入口。 */
+.chart-feature-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  align-items: end;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at top right, rgb(255 255 255 / 14%), transparent 34%),
+    linear-gradient(135deg, #121620 0%, var(--accent) 100%);
+  color: #fff;
+  box-shadow: 0 20px 60px rgb(18 22 30 / 22%);
+}
+
+.chart-feature-copy {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.chart-feature-card .section-kicker,
+.chart-lead-row small {
+  color: #ffcf66;
+}
+
+.chart-feature-card h3,
+.chart-feature-card p,
+.chart-stat-card strong {
+  margin: 0;
+}
+
+.chart-feature-card h3 {
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 0.98;
+}
+
+.chart-feature-card p {
+  max-width: 520px;
+  color: rgb(255 255 255 / 74%);
+}
+
+.chart-feature-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chart-feature-card .primary-button {
+  background: #fff;
+  color: #121620;
+  box-shadow: none;
+}
+
+.chart-feature-card .ghost-button {
+  border-color: rgb(255 255 255 / 18%);
+  background: rgb(255 255 255 / 10%);
+  color: #fff;
+}
+
+.chart-lead-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 10%);
+  backdrop-filter: blur(10px);
+}
+
+.chart-lead-row img {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.chart-lead-row span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.chart-lead-row strong,
+.chart-lead-row em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-lead-row em {
+  color: rgb(255 255 255 / 74%);
+  font-style: normal;
+}
+
+.chart-stat-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.chart-stat-card {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid rgb(34 28 23 / 10%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 84%);
+  box-shadow: 0 16px 48px rgb(31 23 17 / 8%);
+}
+
+.chart-stat-card > span {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef4f1;
+  color: #b3261e;
+}
+
+.chart-stat-card small {
+  color: #756c62;
+}
+
+.chart-stat-card strong {
+  font-size: 22px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
 .chart-card {
+  display: grid;
+  gap: 16px;
   padding: 16px;
 }
 
 .chart-head {
   display: flex;
+  align-items: stretch;
   gap: 12px;
-  margin-bottom: 16px;
 }
 
 .chart-head > span {
@@ -2513,8 +2795,80 @@ function playSearchAlbum(album: SearchAlbumResult) {
   background: var(--accent);
 }
 
+.chart-head-body {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.chart-title-row {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-title-row h3 {
+  overflow-wrap: anywhere;
+}
+
+.chart-title-row em {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgb(179 38 30 / 10%);
+  color: #b3261e;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .chart-card p {
+  margin: 0;
   color: #6f665c;
+}
+
+.chart-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-meta-row small {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #f6f8fb;
+  color: #5f574f;
+}
+
+.chart-play-button {
+  width: fit-content;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: #121620;
+  color: #fff;
+  text-align: center;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
+}
+
+.chart-play-button:hover {
+  background: #1d2432;
+  box-shadow: 0 12px 26px rgb(18 22 30 / 18%);
+  transform: translateY(-1px);
 }
 
 .chart-card ol {
@@ -2525,7 +2879,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
   list-style: none;
 }
 
-.chart-card button {
+.chart-track-button {
   width: 100%;
   display: grid;
   grid-template-columns: 24px 42px minmax(0, 1fr) 44px;
@@ -2538,12 +2892,19 @@ function playSearchAlbum(album: SearchAlbumResult) {
   text-align: left;
 }
 
+.chart-track-button > span:first-child {
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-weight: 800;
+}
+
 .chart-track-meta {
   display: grid;
   gap: 3px;
 }
 
-.chart-card button:hover {
+.chart-track-button:hover {
   background: #edf3f6;
 }
 
@@ -2559,7 +2920,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
   color: #756c62;
 }
 
-.chart-card button time {
+.chart-track-button time {
   justify-self: end;
   white-space: nowrap;
 }
@@ -2982,6 +3343,15 @@ input[type='range'] {
     grid-template-columns: 1fr 1fr;
   }
 
+  .chart-dashboard,
+  .chart-feature-card {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .search-results-overview {
     grid-template-columns: 1fr;
   }
@@ -3055,6 +3425,7 @@ input[type='range'] {
   .main-grid,
   .playlist-grid,
   .chart-grid,
+  .chart-dashboard,
   .library-dashboard,
   .library-grid,
   .recent-grid,
@@ -3079,6 +3450,37 @@ input[type='range'] {
   .search-album-card img {
     width: 44px;
     height: 44px;
+  }
+
+  .chart-feature-card,
+  .chart-stat-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-feature-card {
+    padding: 18px;
+  }
+
+  .chart-feature-actions,
+  .chart-title-row,
+  .chart-meta-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chart-feature-actions .primary-button,
+  .chart-feature-actions .ghost-button,
+  .chart-play-button {
+    width: 100%;
+  }
+
+  .chart-lead-row {
+    grid-template-columns: 60px minmax(0, 1fr);
+  }
+
+  .chart-lead-row img {
+    width: 60px;
+    height: 60px;
   }
 
   .continue-card {
