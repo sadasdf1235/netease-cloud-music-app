@@ -670,6 +670,10 @@ const playModeMeta = computed(() => {
   return { icon: 'i-carbon-repeat', label: '顺序播放' }
 })
 
+const queueButtonLabel = computed(() => {
+  return `打开播放队列，当前 ${queue.value.length} 首`
+})
+
 /**
  * 保存播放器和个人音乐状态。
  */
@@ -1746,6 +1750,16 @@ function playSearchAlbum(album: SearchAlbumResult) {
       </div>
 
       <div class="player-tools">
+        <button
+          type="button"
+          class="icon-button queue-toggle-button"
+          :data-count="queue.length"
+          :title="queueButtonLabel"
+          :aria-label="queueButtonLabel"
+          @click="toggleQueuePanel"
+        >
+          <span class="i-carbon-list" aria-hidden="true"></span>
+        </button>
         <button
           type="button"
           class="icon-button mode-button"
@@ -3273,6 +3287,28 @@ function playSearchAlbum(album: SearchAlbumResult) {
   color: #fff;
 }
 
+.queue-toggle-button {
+  position: relative;
+}
+
+.queue-toggle-button::after {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  min-width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #ffcf66;
+  color: #121620;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  content: attr(data-count);
+}
+
 .progress-line {
   display: grid;
   grid-template-columns: 44px 1fr 44px;
@@ -3516,12 +3552,75 @@ input[type='range'] {
   }
 
   .player-bar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'track tools'
+      'controls controls';
+    gap: 10px 12px;
+    padding: 12px 14px 10px;
+  }
+
+  .player-track {
+    grid-area: track;
+    grid-template-columns: 44px minmax(0, 1fr);
     gap: 10px;
   }
 
-  .player-tools {
+  .player-track img {
+    width: 44px;
+    height: 44px;
+  }
+
+  .player-track strong,
+  .player-track small {
+    max-width: 100%;
+  }
+
+  .player-track small {
+    font-size: 12px;
+  }
+
+  .player-controls {
+    grid-area: controls;
+    gap: 10px;
+  }
+
+  .control-buttons {
     justify-content: space-between;
+  }
+
+  .play-button {
+    width: 42px;
+    height: 42px;
+  }
+
+  .progress-line {
+    grid-template-columns: 34px 1fr 34px;
+    gap: 6px;
+  }
+
+  .player-tools {
+    grid-area: tools;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+
+  .player-tools .icon-button {
+    width: 32px;
+    height: 32px;
+  }
+
+  .volume-control {
+    display: none;
+  }
+
+  .queue-toggle-button::after {
+    right: -2px;
+    top: -2px;
+  }
+
+  .toast {
+    bottom: 168px;
   }
 }
 </style>
