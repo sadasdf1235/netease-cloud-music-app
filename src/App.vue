@@ -1790,10 +1790,10 @@ function playSearchAlbum(album: SearchAlbumResult) {
                 </div>
                 <span class="energy-meter" :style="{ '--energy': `${track.energy}%` }"></span>
                 <span class="track-count">{{ formatPlayCount(track.plays) }}</span>
-                <button type="button" class="icon-button" @click="toggleLike(track)" :aria-label="isLiked(track) ? '取消收藏' : '收藏歌曲'">
+                <button type="button" class="icon-button" @click="toggleLike(track)" :aria-label="isLiked(track) ? `取消收藏 ${track.title}` : `收藏 ${track.title}`">
                   <span :class="isLiked(track) ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" aria-hidden="true"></span>
                 </button>
-                <button type="button" class="icon-button" aria-label="添加到队列" @click="addToQueue(track)">
+                <button type="button" class="icon-button" :aria-label="`添加 ${track.title} 到队列`" @click="addToQueue(track)">
                   <span class="i-carbon-add-alt" aria-hidden="true"></span>
                 </button>
                 <time>{{ formatTime(track.duration) }}</time>
@@ -2267,7 +2267,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
                 <strong>{{ track.title }}</strong>
                 <small>{{ track.artist }} · {{ track.album }}</small>
               </div>
-              <button type="button" class="icon-button" aria-label="添加到队列" @click="addToQueue(track)">
+              <button type="button" class="icon-button" :aria-label="`添加 ${track.title} 到队列`" @click="addToQueue(track)">
                 <span class="i-carbon-add-alt" aria-hidden="true"></span>
               </button>
               <time>{{ formatTime(track.duration) }}</time>
