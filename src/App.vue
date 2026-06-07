@@ -785,6 +785,11 @@ const queueButtonLabel = computed(() => {
   return `打开播放队列，当前 ${queue.value.length} 首`
 })
 
+const queueSummaryLabel = computed(() => {
+  if (queueIndex.value < 0) return `${queue.value.length} 首歌曲`
+  return `${queue.value.length} 首歌曲 · 当前第 ${queueIndex.value + 1} 首`
+})
+
 /**
  * 保存播放器和个人音乐状态。
  */
@@ -1266,6 +1271,45 @@ function closeQueuePanel() {
 }
 
 /**
+ * 获取歌曲在播放队列中的位置。
+ * @param track 目标歌曲
+ * @returns 队列索引
+ */
+function findQueueTrackIndex(track: Track) {
+  return queue.value.findIndex((item) => item.id === track.id)
+}
+
+/**
+ * 交换播放队列中的两首歌曲。
+ * @param source 原始队列
+ * @param currentIndex 当前索引
+ * @param nextIndex 目标索引
+ * @returns 调整后的队列
+ */
+function swapQueueTracks(source: Track[], currentIndex: number, nextIndex: number) {
+  const nextQueue = [...source]
+  const currentTrackItem = nextQueue[currentIndex]
+  const nextTrackItem = nextQueue[nextIndex]
+  if (!currentTrackItem || !nextTrackItem) return source
+  nextQueue[currentIndex] = nextTrackItem
+  nextQueue[nextIndex] = currentTrackItem
+  return nextQueue
+}
+
+/**
+ * 将歌曲插入到队列指定位置。
+ * @param source 原始队列
+ * @param track 目标歌曲
+ * @param index 插入位置
+ * @returns 插入后的队列
+ */
+function insertQueueTrackAt(source: Track[], track: Track, index: number) {
+  const nextQueue = [...source]
+  nextQueue.splice(Math.max(0, index), 0, track)
+  return nextQueue
+}
+
+/**
  * 从播放队列移除歌曲。
  * @param track 目标歌曲
  */
@@ -1284,6 +1328,51 @@ function removeFromQueue(track: Track) {
   }
 
   showToast('已从播放队列移除')
+}
+
+/**
+ * 调整歌曲在播放队列中的顺序。
+ * @param track 目标歌曲
+ * @param direction 移动方向，-1 为上移，1 为下移
+ */
+function moveQueueTrack(track: Track, direction: -1 | 1) {
+  const currentIndex = findQueueTrackIndex(track)
+  const nextIndex = currentIndex + direction
+
+  if (currentIndex < 0) return
+
+  if (nextIndex < 0 || nextIndex >= queue.value.length) {
+    showToast(direction < 0 ? '已在队列顶部' : '已在队列底部')
+    return
+  }
+
+  queue.value = swapQueueTracks(queue.value, currentIndex, nextIndex)
+  showToast('已调整播放顺序')
+}
+
+/**
+ * 将歌曲设为当前歌曲后的下一首。
+ * @param track 目标歌曲
+ */
+function playQueueTrackNext(track: Track) {
+  if (track.id === currentTrack.value.id) {
+    showToast('当前歌曲正在播放')
+    return
+  }
+
+  const queueWithoutTrack = queue.value.filter((item) => item.id !== track.id)
+  const currentIndex = queueWithoutTrack.findIndex((item) => item.id === currentTrack.value.id)
+  const insertIndex = currentIndex >= 0 ? currentIndex + 1 : 1
+  queue.value = insertQueueTrackAt(queueWithoutTrack, track, insertIndex)
+  showToast(`已将《${track.title}》设为下一首`)
+}
+
+/**
+ * 仅保留当前播放歌曲。
+ */
+function keepCurrentQueueTrack() {
+  queue.value = [currentTrack.value]
+  showToast('已仅保留当前播放')
 }
 
 /**
@@ -2069,11 +2158,15 @@ function playSearchAlbum(album: SearchAlbumResult) {
           <span class="i-carbon-restart" aria-hidden="true"></span>
           重置每日推荐
         </button>
-        <small>{{ queue.length }} 首歌曲</small>
+        <button type="button" class="ghost-button subtle" @click="keepCurrentQueueTrack">
+          <span class="i-carbon-music" aria-hidden="true"></span>
+          仅保留当前
+        </button>
+        <small>{{ queueSummaryLabel }}</small>
       </div>
 
       <article
-        v-for="track in queue"
+        v-for="(track, index) in queue"
         :key="track.id"
         :class="['queue-item', { active: currentTrack.id === track.id }]"
       >
@@ -2085,9 +2178,37 @@ function playSearchAlbum(album: SearchAlbumResult) {
           </span>
         </button>
         <time>{{ formatTime(track.duration) }}</time>
-        <button type="button" class="queue-remove" @click="removeFromQueue(track)" :aria-label="`从队列移除 ${track.title}`">
-          <span class="i-carbon-close" aria-hidden="true"></span>
-        </button>
+        <div class="queue-controls" aria-label="队列歌曲操作">
+          <button
+            type="button"
+            class="queue-tool"
+            @click="playQueueTrackNext(track)"
+            :aria-label="`将 ${track.title} 设为下一首播放`"
+          >
+            <span class="i-carbon-next-filled" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            class="queue-tool queue-move"
+            :disabled="index === 0"
+            @click="moveQueueTrack(track, -1)"
+            :aria-label="`上移 ${track.title}`"
+          >
+            <span class="i-carbon-arrow-up" aria-hidden="true"></span>
+          </button>
+          <button
+            type="button"
+            class="queue-tool queue-move"
+            :disabled="index === queue.length - 1"
+            @click="moveQueueTrack(track, 1)"
+            :aria-label="`下移 ${track.title}`"
+          >
+            <span class="i-carbon-arrow-down" aria-hidden="true"></span>
+          </button>
+          <button type="button" class="queue-tool danger" @click="removeFromQueue(track)" :aria-label="`从队列移除 ${track.title}`">
+            <span class="i-carbon-close" aria-hidden="true"></span>
+          </button>
+        </div>
       </article>
     </aside>
 
@@ -2261,7 +2382,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .search-artist-card,
 .search-album-card,
 .queue-play,
-.queue-remove {
+.queue-tool {
   border: 0;
   font: inherit;
   cursor: pointer;
@@ -4036,14 +4157,26 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .queue-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 10px;
   padding: 0 8px 14px;
   border-bottom: 1px solid rgb(34 28 23 / 8%);
 }
 
+.queue-actions .ghost-button {
+  flex: 1 1 150px;
+  justify-content: center;
+}
+
+.queue-actions .ghost-button.subtle {
+  border-color: transparent;
+  background: #edf3f6;
+  color: #24313c;
+}
+
 .queue-actions small {
+  flex: 1 0 100%;
   color: #746a5d;
   white-space: nowrap;
 }
@@ -4051,9 +4184,12 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .queue-item {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px 36px;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  grid-template-areas:
+    'track time'
+    'controls controls';
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   padding: 9px;
   border-radius: 8px;
 }
@@ -4064,6 +4200,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
 }
 
 .queue-play {
+  grid-area: track;
   min-width: 0;
   display: grid;
   grid-template-columns: 46px minmax(0, 1fr);
@@ -4098,23 +4235,42 @@ function playSearchAlbum(album: SearchAlbumResult) {
 }
 
 .queue-item time {
+  grid-area: time;
   color: #766d62;
   font-size: 13px;
+  justify-self: end;
 }
 
-.queue-remove {
-  width: 32px;
+.queue-controls {
+  grid-area: controls;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.queue-tool {
+  min-width: 0;
   height: 32px;
   display: grid;
   place-items: center;
   border-radius: 8px;
-  background: transparent;
+  background: #fff;
   color: #8b8176;
 }
 
-.queue-remove:hover {
+.queue-tool:hover {
+  background: rgb(36 106 115 / 10%);
+  color: #246a73;
+}
+
+.queue-tool.danger:hover {
   background: rgb(179 38 30 / 10%);
   color: #b3261e;
+}
+
+.queue-tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.32;
 }
 
 .player-bar {
