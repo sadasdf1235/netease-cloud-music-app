@@ -4,6 +4,8 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 type ViewKey = 'discover' | 'charts' | 'library'
 type MoodKey = '全部' | '通勤' | '夜晚' | '专注' | '派对'
 type PlayMode = 'sequence' | 'repeat' | 'shuffle'
+type PlaybackQuality = 'standard' | 'high' | 'lossless'
+type SleepTimerMinutes = 0 | 15 | 30 | 60
 
 interface Artist {
   id: number
@@ -89,12 +91,16 @@ interface LyricLine {
 }
 
 interface StoredPlayerState {
+  autoPlayNext?: boolean
   currentTime?: number
   currentTrackId?: number
+  immersiveLyrics?: boolean
   likedIds?: number[]
   playMode?: PlayMode
+  playbackQuality?: PlaybackQuality
   queueIds?: number[]
   recentTrackIds?: number[]
+  sleepTimerMinutes?: number
   volume?: number
 }
 
@@ -105,6 +111,19 @@ const navItems: Array<{ key: ViewKey; label: string; icon: string }> = [
 ]
 
 const moods: MoodKey[] = ['全部', '通勤', '夜晚', '专注', '派对']
+
+const playbackQualityOptions: Array<{ key: PlaybackQuality; label: string; detail: string }> = [
+  { key: 'standard', label: '标准', detail: '流畅' },
+  { key: 'high', label: '高品', detail: '均衡' },
+  { key: 'lossless', label: '臻享', detail: '细节' },
+]
+
+const sleepTimerOptions: Array<{ minutes: SleepTimerMinutes; label: string }> = [
+  { minutes: 0, label: '关闭' },
+  { minutes: 15, label: '15 分钟' },
+  { minutes: 30, label: '30 分钟' },
+  { minutes: 60, label: '60 分钟' },
+]
 
 const artists: Artist[] = [
   {
@@ -585,6 +604,47 @@ function restorePlayMode(state: StoredPlayerState): PlayMode {
   return 'sequence'
 }
 
+/**
+ * 从缓存状态恢复音质偏好。
+ * @param state 缓存状态
+ * @returns 可用的音质档位
+ */
+function restorePlaybackQuality(state: StoredPlayerState): PlaybackQuality {
+  if (state.playbackQuality === 'standard' || state.playbackQuality === 'lossless') return state.playbackQuality
+  return 'high'
+}
+
+/**
+ * 从缓存状态恢复睡眠定时。
+ * @param state 缓存状态
+ * @returns 可用的睡眠定时分钟数
+ */
+function restoreSleepTimerMinutes(state: StoredPlayerState): SleepTimerMinutes {
+  if (state.sleepTimerMinutes === 15 || state.sleepTimerMinutes === 30 || state.sleepTimerMinutes === 60) {
+    return state.sleepTimerMinutes
+  }
+
+  return 0
+}
+
+/**
+ * 从缓存状态恢复自动续播偏好。
+ * @param state 缓存状态
+ * @returns 是否自动播放下一首
+ */
+function restoreAutoPlayNext(state: StoredPlayerState) {
+  return state.autoPlayNext !== false
+}
+
+/**
+ * 从缓存状态恢复沉浸歌词偏好。
+ * @param state 缓存状态
+ * @returns 是否默认展开歌词
+ */
+function restoreImmersiveLyrics(state: StoredPlayerState) {
+  return state.immersiveLyrics === true
+}
+
 const storedPlayerState = readStoredPlayerState()
 const initialQueue = restoreQueue(storedPlayerState)
 const initialCurrentTrack = restoreCurrentTrack(storedPlayerState, initialQueue)
@@ -606,7 +666,12 @@ const likedIds = ref<Set<number>>(new Set(restoreLikedIds(storedPlayerState)))
 const recentTrackIds = ref<number[]>(initialRecentTrackIds)
 const playMode = ref<PlayMode>(restorePlayMode(storedPlayerState))
 const isQueueOpen = ref(false)
-const isLyricOpen = ref(false)
+const isSettingsOpen = ref(false)
+const playbackQuality = ref<PlaybackQuality>(restorePlaybackQuality(storedPlayerState))
+const sleepTimerMinutes = ref<SleepTimerMinutes>(restoreSleepTimerMinutes(storedPlayerState))
+const autoPlayNext = ref(restoreAutoPlayNext(storedPlayerState))
+const immersiveLyrics = ref(restoreImmersiveLyrics(storedPlayerState))
+const isLyricOpen = ref(immersiveLyrics.value)
 const toastMessage = ref('')
 const albums = createAlbumResults()
 const selectedPlaylist = ref<Playlist>(playlists[0])
@@ -790,6 +855,19 @@ const queueSummaryLabel = computed(() => {
   return `${queue.value.length} 首歌曲 · 当前第 ${queueIndex.value + 1} 首`
 })
 
+const currentQualityMeta = computed(() => {
+  return playbackQualityOptions.find((option) => option.key === playbackQuality.value) || playbackQualityOptions[1]
+})
+
+const sleepTimerLabel = computed(() => {
+  if (!sleepTimerMinutes.value) return '睡眠定时已关闭'
+  return `${sleepTimerMinutes.value} 分钟后暂停播放`
+})
+
+const settingsButtonLabel = computed(() => {
+  return `打开播放设置，当前音质 ${currentQualityMeta.value.label}`
+})
+
 /**
  * 保存播放器和个人音乐状态。
  */
@@ -797,19 +875,27 @@ function savePlayerState() {
   if (!canUseStorage()) return
 
   const state: StoredPlayerState = {
+    autoPlayNext: autoPlayNext.value,
     currentTime: Math.floor(currentTime.value),
     currentTrackId: currentTrack.value.id,
+    immersiveLyrics: immersiveLyrics.value,
     likedIds: [...likedIds.value],
     playMode: playMode.value,
+    playbackQuality: playbackQuality.value,
     queueIds: queue.value.map((track) => track.id),
     recentTrackIds: recentTrackIds.value,
+    sleepTimerMinutes: sleepTimerMinutes.value,
     volume: volume.value,
   }
 
   window.localStorage.setItem(playerStorageKey, JSON.stringify(state))
 }
 
-watch([currentTrack, currentTime, queue, likedIds, playMode, recentTrackIds, volume], savePlayerState, { deep: true })
+watch(
+  [currentTrack, currentTime, queue, likedIds, playMode, recentTrackIds, volume, playbackQuality, sleepTimerMinutes, autoPlayNext, immersiveLyrics],
+  savePlayerState,
+  { deep: true },
+)
 
 onMounted(() => {
   duration.value = currentTrack.value.duration
@@ -826,6 +912,7 @@ onMounted(() => {
 function setView(view: ViewKey) {
   activeView.value = view
   isQueueOpen.value = false
+  isSettingsOpen.value = false
   if (view !== 'discover') {
     searchKeyword.value = ''
     activeMood.value = '全部'
@@ -1156,6 +1243,20 @@ function playNextTrack() {
 }
 
 /**
+ * 处理歌曲自然播放结束。
+ */
+function handleTrackEnded() {
+  if (!autoPlayNext.value) {
+    isPlaying.value = false
+    currentTime.value = 0
+    showToast('自动续播已关闭')
+    return
+  }
+
+  playNextTrack()
+}
+
+/**
  * 播放队列中的上一首。
  */
 function playPreviousTrack() {
@@ -1268,6 +1369,57 @@ function toggleQueuePanel() {
  */
 function closeQueuePanel() {
   isQueueOpen.value = false
+}
+
+/**
+ * 打开或关闭播放设置面板。
+ */
+function toggleSettingsPanel() {
+  isSettingsOpen.value = !isSettingsOpen.value
+  if (isSettingsOpen.value) isQueueOpen.value = false
+}
+
+/**
+ * 关闭播放设置面板。
+ */
+function closeSettingsPanel() {
+  isSettingsOpen.value = false
+}
+
+/**
+ * 切换音质偏好。
+ * @param quality 目标音质档位
+ */
+function selectPlaybackQuality(quality: PlaybackQuality) {
+  playbackQuality.value = quality
+  const qualityMeta = playbackQualityOptions.find((option) => option.key === quality)
+  showToast(`已切换为${qualityMeta?.label || '高品'}音质`)
+}
+
+/**
+ * 切换自动续播偏好。
+ */
+function toggleAutoPlayNext() {
+  autoPlayNext.value = !autoPlayNext.value
+  showToast(autoPlayNext.value ? '已开启自动续播' : '已关闭自动续播')
+}
+
+/**
+ * 切换沉浸歌词偏好。
+ */
+function toggleImmersiveLyrics() {
+  immersiveLyrics.value = !immersiveLyrics.value
+  isLyricOpen.value = immersiveLyrics.value
+  showToast(immersiveLyrics.value ? '已开启沉浸歌词' : '已关闭沉浸歌词')
+}
+
+/**
+ * 设置睡眠定时。
+ * @param minutes 睡眠定时分钟数
+ */
+function setSleepTimer(minutes: SleepTimerMinutes) {
+  sleepTimerMinutes.value = minutes
+  showToast(minutes ? `将在 ${minutes} 分钟后暂停` : '已关闭睡眠定时')
 }
 
 /**
@@ -2142,6 +2294,14 @@ function playSearchAlbum(album: SearchAlbumResult) {
       @click="closeQueuePanel"
     ></button>
 
+    <button
+      v-if="isSettingsOpen"
+      type="button"
+      class="settings-backdrop"
+      aria-label="关闭播放设置"
+      @click="closeSettingsPanel"
+    ></button>
+
     <aside :class="['queue-panel', { open: isQueueOpen }]" aria-label="播放队列">
       <div class="queue-head">
         <div>
@@ -2212,6 +2372,89 @@ function playSearchAlbum(album: SearchAlbumResult) {
       </article>
     </aside>
 
+    <aside :class="['settings-panel', { open: isSettingsOpen }]" aria-label="播放设置">
+      <div class="queue-head">
+        <div>
+          <span class="section-kicker">Settings</span>
+          <h2>播放设置</h2>
+        </div>
+        <button type="button" class="icon-button" @click="closeSettingsPanel" aria-label="关闭播放设置">
+          <span class="i-carbon-close" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <section class="settings-block" aria-label="音质设置">
+        <div class="settings-block-head">
+          <span class="settings-icon" aria-hidden="true">
+            <span class="i-carbon-volume-up"></span>
+          </span>
+          <div>
+            <strong>音质偏好</strong>
+            <small>当前 {{ currentQualityMeta.label }} · {{ currentQualityMeta.detail }}</small>
+          </div>
+        </div>
+        <div class="quality-segments">
+          <button
+            v-for="option in playbackQualityOptions"
+            :key="option.key"
+            type="button"
+            :class="{ active: playbackQuality === option.key }"
+            @click="selectPlaybackQuality(option.key)"
+            :aria-label="`切换为${option.label}音质`"
+          >
+            <strong>{{ option.label }}</strong>
+            <small>{{ option.detail }}</small>
+          </button>
+        </div>
+      </section>
+
+      <section class="settings-block" aria-label="播放行为设置">
+        <button type="button" class="settings-toggle" @click="toggleAutoPlayNext" :aria-pressed="autoPlayNext">
+          <span class="settings-icon" aria-hidden="true">
+            <span class="i-carbon-next-filled"></span>
+          </span>
+          <span>
+            <strong>自动续播</strong>
+            <small>{{ autoPlayNext ? '歌曲结束后继续下一首' : '歌曲结束后暂停' }}</small>
+          </span>
+          <i :class="{ active: autoPlayNext }" aria-hidden="true"></i>
+        </button>
+        <button type="button" class="settings-toggle" @click="toggleImmersiveLyrics" :aria-pressed="immersiveLyrics">
+          <span class="settings-icon" aria-hidden="true">
+            <span class="i-carbon-microphone"></span>
+          </span>
+          <span>
+            <strong>沉浸歌词</strong>
+            <small>{{ immersiveLyrics ? '播放页默认展开歌词' : '手动查看歌词' }}</small>
+          </span>
+          <i :class="{ active: immersiveLyrics }" aria-hidden="true"></i>
+        </button>
+      </section>
+
+      <section class="settings-block" aria-label="睡眠定时">
+        <div class="settings-block-head">
+          <span class="settings-icon" aria-hidden="true">
+            <span class="i-carbon-timer"></span>
+          </span>
+          <div>
+            <strong>睡眠定时</strong>
+            <small>{{ sleepTimerLabel }}</small>
+          </div>
+        </div>
+        <div class="sleep-options">
+          <button
+            v-for="option in sleepTimerOptions"
+            :key="option.minutes"
+            type="button"
+            :class="{ active: sleepTimerMinutes === option.minutes }"
+            @click="setSleepTimer(option.minutes)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </section>
+    </aside>
+
     <footer class="player-bar">
       <audio
         ref="audioRef"
@@ -2219,7 +2462,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
         preload="metadata"
         @loadedmetadata="handleLoadedMetadata"
         @timeupdate="handleTimeUpdate"
-        @ended="playNextTrack"
+        @ended="handleTrackEnded"
       ></audio>
 
       <div class="player-track">
@@ -2279,6 +2522,15 @@ function playSearchAlbum(album: SearchAlbumResult) {
         </button>
         <button type="button" class="icon-button" @click="toggleLike(currentTrack)" aria-label="收藏当前歌曲">
           <span :class="isLiked(currentTrack) ? 'i-carbon-favorite-filled' : 'i-carbon-favorite'" aria-hidden="true"></span>
+        </button>
+        <button
+          type="button"
+          class="icon-button settings-toggle-button"
+          :title="settingsButtonLabel"
+          :aria-label="settingsButtonLabel"
+          @click="toggleSettingsPanel"
+        >
+          <span class="i-carbon-settings" aria-hidden="true"></span>
         </button>
         <label class="volume-control">
           <span class="i-carbon-volume-up" aria-hidden="true"></span>
@@ -4134,7 +4386,17 @@ function playSearchAlbum(album: SearchAlbumResult) {
   cursor: pointer;
 }
 
-.queue-panel {
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 18;
+  border: 0;
+  background: rgb(18 22 30 / 30%);
+  cursor: pointer;
+}
+
+.queue-panel,
+.settings-panel {
   position: fixed;
   top: 0;
   right: 0;
@@ -4150,7 +4412,8 @@ function playSearchAlbum(album: SearchAlbumResult) {
   transition: transform 0.24s ease;
 }
 
-.queue-panel.open {
+.queue-panel.open,
+.settings-panel.open {
   transform: translateX(0);
 }
 
@@ -4271,6 +4534,127 @@ function playSearchAlbum(album: SearchAlbumResult) {
 .queue-tool:disabled {
   cursor: not-allowed;
   opacity: 0.32;
+}
+
+.settings-panel {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+}
+
+.settings-block {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgb(34 28 23 / 8%);
+  border-radius: 8px;
+  background: #fbfaf7;
+}
+
+.settings-block-head {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #edf3f6;
+  color: #246a73;
+}
+
+.settings-icon :where([class^='i-carbon-'], [class*=' i-carbon-']) {
+  color: inherit;
+}
+
+.settings-block strong,
+.settings-block small {
+  display: block;
+}
+
+.settings-block small {
+  color: #756c62;
+}
+
+.quality-segments,
+.sleep-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quality-segments button,
+.sleep-options button,
+.settings-toggle {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.quality-segments button,
+.sleep-options button {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #fff;
+  color: #24313c;
+  text-align: center;
+}
+
+.quality-segments button.active,
+.sleep-options button.active {
+  background: #121620;
+  color: #fff;
+}
+
+.quality-segments button.active small {
+  color: rgb(255 255 255 / 68%);
+}
+
+.settings-toggle {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+}
+
+.settings-toggle i {
+  width: 46px;
+  height: 26px;
+  position: relative;
+  border-radius: 999px;
+  background: #ddd6cc;
+}
+
+.settings-toggle i::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s ease;
+}
+
+.settings-toggle i.active {
+  background: #246a73;
+}
+
+.settings-toggle i.active::after {
+  transform: translateX(20px);
 }
 
 .player-bar {
