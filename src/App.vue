@@ -2298,7 +2298,7 @@ function playSearchAlbum(album: SearchAlbumResult) {
       v-if="isSettingsOpen"
       type="button"
       class="settings-backdrop"
-      aria-label="关闭播放设置"
+      aria-label="点击遮罩关闭播放设置"
       @click="closeSettingsPanel"
     ></button>
 
